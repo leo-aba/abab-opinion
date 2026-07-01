@@ -1,0 +1,48 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+.eggs/
+*.whl
+
+# Virtual environments
+venv/
+.venv/
+env/
+.env
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Jupyter
+.ipynb_checkpoints/
+*.ipynb_checkpoints
+
+# Data (本地数据不提交)
+data/
+
+# Models (大文件不提交，1.2GB+)
+models/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Environment (含敏感信息，不提交)
+.env
+
+# Claude
+.claude/
+
+# Test data
+test/*.json
+test/*.txt
+
+# Documents
+*.docx

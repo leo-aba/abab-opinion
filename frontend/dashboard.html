@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dashboard — AI Video Opinion Analytics</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<div class="page app-page active" id="page-app">
+
+  <!-- Sidebar overlay (mobile) -->
+  <div class="sidebar-overlay" id="sidebar-overlay" onclick="closeSidebar()"></div>
+
+  <!-- Sidebar -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-logo">
+      <img src="logo.png" alt="Opinion AI" style="width:32px;height:32px;">
+      Opinion AI
+    </div>
+    <nav class="sidebar-nav">
+      <div class="nav-section">主菜单</div>
+      <a href="dashboard.html" class="nav-item active">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+        Dashboard
+      </a>
+      <a href="create-analysis.html" class="nav-item">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 8v8M8 12h8"/></svg>
+        创建分析
+      </a>
+      <a href="pipeline.html" class="nav-item">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+        实时分析
+      </a>
+      <a href="tracking.html" class="nav-item" id="nav-tracking" style="display:none;">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="4" fill="currentColor"/><line x1="12" y1="2" x2="12" y2="6"/><line x1="12" y1="18" x2="12" y2="22"/><line x1="2" y1="12" x2="6" y2="12"/><line x1="18" y1="12" x2="22" y2="12"/></svg>
+        实时追踪
+        <span class="tracking-live-dot" id="sidebar-tracking-dot" style="display:none;"></span>
+      </a>
+      <a href="results.html" class="nav-item">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 20V10M12 20V4M6 20v-6"/></svg>
+        分析结果
+      </a>
+      <div class="nav-section">管理</div>
+      <a href="videos.html" class="nav-item">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>
+        视频管理
+      </a>
+      <a href="history.html" class="nav-item">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+        历史记录
+      </a>
+      <a href="settings.html" class="nav-item">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
+        系统设置
+      </a>
+    </nav>
+    <div class="sidebar-footer">
+      <div class="sidebar-user">
+        <div class="sidebar-avatar" id="sidebar-avatar-text">L</div>
+        <div class="sidebar-user-info">
+          <div class="sidebar-user-name" id="sidebar-display-name">加载中...</div>
+          <div class="sidebar-user-role" id="sidebar-role">—</div>
+        </div>
+      </div>
+      <button class="logout-btn" onclick="doLogout()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9"/></svg>
+        退出登录
+      </button>
+    </div>
+  </aside>
+
+  <!-- Main Content -->
+  <div class="main-content">
+    <!-- Header -->
+    <header class="top-header">
+      <div class="header-left">
+        <button class="mobile-menu-btn" onclick="toggleSidebar()">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+        </button>
+        <h2 id="header-title">Dashboard</h2>
+        <div class="greeting" id="header-greeting">欢迎回来</div>
+      </div>
+      <div class="header-stats">
+        <div class="header-stat"><div class="val" id="stat-today-comments">—</div><div class="lbl">今日评论</div></div>
+        <div class="header-stat"><div class="val" id="stat-new-videos">—</div><div class="lbl">新增视频</div></div>
+        <div class="header-stat"><div class="val" id="stat-completion">—</div><div class="lbl">分析完成</div></div>
+        <div class="header-stat"><div class="val" id="stat-hot-topic">—</div><div class="lbl">最近热点</div></div>
+      </div>
+    </header>
+
+    <!-- Page Content -->
+    <div class="page-content active" id="content-dashboard">
+      <!-- Stat cards -->
+      <div class="stat-cards">
+        <div class="stat-card">
+          <div class="stat-card-header">
+            <span class="stat-card-label">评论总数</span>
+            <div class="stat-card-icon blue">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
+            </div>
+          </div>
+          <div class="stat-card-value" id="total-comments">—</div>
+          <div class="stat-card-change" id="total-comments-change">—</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-card-header">
+            <span class="stat-card-label">视频数量</span>
+            <div class="stat-card-icon green">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>
+            </div>
+          </div>
+          <div class="stat-card-value" id="total-videos">—</div>
+          <div class="stat-card-change" id="total-videos-change">—</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-card-header">
+            <span class="stat-card-label">热门 Topic</span>
+            <div class="stat-card-icon purple">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20V10M18 20V4M6 20v-6"/></svg>
+            </div>
+          </div>
+          <div class="stat-card-value" id="hot-topic">—</div>
+          <div class="stat-card-change" id="hot-topic-count" style="color:var(--text-secondary)">—</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-card-header">
+            <span class="stat-card-label">平均情绪</span>
+            <div class="stat-card-icon yellow">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/></svg>
+            </div>
+          </div>
+          <div class="stat-card-value" id="avg-sentiment">—</div>
+          <div class="stat-card-change" id="avg-sentiment-change">—</div>
+        </div>
+      </div>
+
+      <!-- Active Tracking Tasks -->
+      <div id="dashboard-tracking-section" style="display:none; margin-bottom:28px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
+          <h3 style="font-size:16px;font-weight:600;display:flex;align-items:center;gap:8px;">
+            <span class="tracking-live-dot"></span> 实时追踪任务
+          </h3>
+          <a href="tracking.html" class="btn-sm">查看全部 →</a>
+        </div>
+        <div id="dashboard-tracking-cards" class="stat-cards" style="grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));"></div>
+      </div>
+
+      <!-- Chart row: trend line + sentiment pie -->
+      <div class="chart-row">
+        <div class="chart-card">
+          <div class="chart-card-header">
+            <h3>评论增长趋势</h3>
+            <span class="chart-badge">近30天</span>
+          </div>
+          <div class="chart-wrap"><canvas id="trendChart"></canvas></div>
+        </div>
+        <div class="chart-card">
+          <div class="chart-card-header">
+            <h3>情绪占比</h3>
+          </div>
+          <div class="chart-wrap" style="max-width:260px;margin:0 auto;"><canvas id="sentimentPie"></canvas></div>
+        </div>
+      </div>
+
+      <!-- TOP10 Topics bar chart -->
+      <div class="chart-card">
+        <div class="chart-card-header">
+          <h3>TOP10 热门 Topic</h3>
+          <span style="font-size:12px;color:var(--text-secondary)">按评论数量排序</span>
+        </div>
+        <div class="chart-wrap" style="height:340px;"><canvas id="topicBarChart"></canvas></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="js/api.js"></script>
+<script src="js/common.js"></script>
+<script src="js/charts.js"></script>
+<script>
+  document.addEventListener('DOMContentLoaded', async function() {
+    // 1. Init page — loads user profile, header stats, tracking visibility
+    await initPage({ loadUser: true, loadHeaderStats: true });
+
+    // 2. Load dashboard summary for stat cards
+    try {
+      const summary = await api.getDashboardSummary();
+      if (summary) {
+        setText('total-comments', (summary.total_comments || 0).toLocaleString());
+
+        // Comments change indicator
+        const commentsChangeEl = document.getElementById('total-comments-change');
+        if (commentsChangeEl) {
+          const dir = summary.total_comments_change_direction;
+          const changeVal = summary.total_comments_change != null ? summary.total_comments_change : 0;
+          const arrow = dir === 'up' ? '↑' : dir === 'down' ? '↓' : '';
+          const cls = dir === 'up' ? 'up' : dir === 'down' ? 'down' : '';
+          commentsChangeEl.className = 'stat-card-change ' + cls;
+          commentsChangeEl.innerHTML = arrow + ' ' + changeVal + '% <span style="color:var(--text-secondary);font-weight:400">较上月</span>';
+        }
+
+        setText('total-videos', (summary.total_videos || 0).toLocaleString());
+
+        // Videos change indicator
+        const videosChangeEl = document.getElementById('total-videos-change');
+        if (videosChangeEl) {
+          const dir = summary.total_videos_change_direction;
+          const changeVal = summary.total_videos_change != null ? summary.total_videos_change : 0;
+          const arrow = dir === 'up' ? '↑' : dir === 'down' ? '↓' : '';
+          const cls = dir === 'up' ? 'up' : dir === 'down' ? 'down' : '';
+          videosChangeEl.className = 'stat-card-change ' + cls;
+          videosChangeEl.innerHTML = arrow + ' ' + changeVal + '% <span style="color:var(--text-secondary);font-weight:400">较上月</span>';
+        }
+
+        setText('hot-topic', summary.hot_topic_name || '—');
+        const hotCount = summary.hot_topic_comment_count != null
+          ? summary.hot_topic_comment_count.toLocaleString() + ' 条相关评论'
+          : '—';
+        setText('hot-topic-count', hotCount);
+
+        setText('avg-sentiment', summary.avg_sentiment || '—');
+
+        // Sentiment change indicator
+        const sentimentChangeEl = document.getElementById('avg-sentiment-change');
+        if (sentimentChangeEl) {
+          const dir = summary.avg_sentiment_change_direction;
+          const changeVal = summary.avg_sentiment_change != null ? summary.avg_sentiment_change : 0;
+          const arrow = dir === 'up' ? '↑' : dir === 'down' ? '↓' : '';
+          const cls = dir === 'up' ? 'up' : dir === 'down' ? 'down' : '';
+          sentimentChangeEl.className = 'stat-card-change ' + cls;
+          sentimentChangeEl.innerHTML = arrow + ' ' + changeVal + '% <span style="color:var(--text-secondary);font-weight:400">正向增长</span>';
+        }
+      }
+    } catch (e) {
+      console.error('Dashboard summary failed:', e);
+      setText('total-comments', '加载失败');
+      setText('total-videos', '加载失败');
+      setText('hot-topic', '加载失败');
+      setText('avg-sentiment', '加载失败');
+    }
+
+    // 3. Init charts (fetches data internally)
+    initDashboardCharts();
+
+    // 4. Load active tracking cards
+    try {
+      const trackingTasks = await api.getDashboardActiveTracking();
+      const section = document.getElementById('dashboard-tracking-section');
+      const container = document.getElementById('dashboard-tracking-cards');
+      if (!container) return;
+
+      if (!trackingTasks || !Array.isArray(trackingTasks) || trackingTasks.length === 0) {
+        // Keep section hidden
+        return;
+      }
+
+      // Show section
+      section.style.display = '';
+
+      let html = '';
+      trackingTasks.forEach(function(t) {
+        const title = t.video_title || '未知视频';
+        const platform = t.platform || '—';
+        const author = t.author || '—';
+        const newComments = t.new_comments != null ? t.new_comments : 0;
+        const credits = t.credits_remaining != null ? t.credits_remaining : 0;
+        const duration = formatDuration(t.duration_seconds || 0);
+
+        html += '<div class="stat-card" style="cursor:pointer;" onclick="location.href=\'results.html?task_id=' + encodeURIComponent(t.task_id) + '\'">' +
+          '<div class="stat-card-header">' +
+            '<span class="stat-card-label" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="' + escapeHTML(title) + '">' + escapeHTML(title) + '</span>' +
+            '<span style="font-size:11px;color:var(--text-secondary);white-space:nowrap;">' + escapeHTML(platform) + '</span>' +
+          '</div>' +
+          '<div style="font-size:12px;color:var(--text-secondary);margin-bottom:8px;">' + escapeHTML(author) + ' · ' + escapeHTML(duration) + '</div>' +
+          '<div style="display:flex;gap:16px;font-size:12px;">' +
+            '<span>🆕 <strong>' + newComments.toLocaleString() + '</strong> 新评论</span>' +
+            '<span>💰 余额 <strong>' + credits.toLocaleString() + '</strong></span>' +
+          '</div>' +
+        '</div>';
+      });
+      container.innerHTML = html;
+    } catch (e) {
+      console.error('Active tracking load failed:', e);
+      // Silently keep section hidden on error
+    }
+
+    // Helper for escaping HTML in tracking card text
+    function escapeHTML(str) {
+      var div = document.createElement('div');
+      div.appendChild(document.createTextNode(str));
+      return div.innerHTML;
+    }
+  });
+</script>
+
+</body>
+</html>

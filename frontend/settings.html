@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="AI Video Opinion Analytics Settings">
+    <title>系统设置 — AI Video Opinion Analytics</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+    <div class="page app-page active" id="page-app">
+
+        <!-- Sidebar Overlay (mobile) -->
+        <div class="sidebar-overlay" id="sidebar-overlay" onclick="closeSidebar()"></div>
+
+        <!-- Sidebar -->
+        <aside class="sidebar" id="sidebar">
+            <div class="sidebar-logo">
+                <img src="logo.png" alt="Opinion AI Logo" style="width:32px;height:32px;">
+                <span>Opinion AI</span>
+            </div>
+
+            <nav class="sidebar-nav">
+                <div class="nav-section">主菜单</div>
+                <a href="dashboard.html" class="nav-item">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+                    <span>Dashboard</span>
+                </a>
+                <a href="create-analysis.html" class="nav-item">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 8v8M8 12h8"/></svg>
+                    <span>创建分析</span>
+                </a>
+                <a href="pipeline.html" class="nav-item">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+                    <span>实时分析</span>
+                </a>
+                <a href="tracking.html" class="nav-item">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="4" fill="currentColor"/><line x1="12" y1="2" x2="12" y2="6"/><line x1="12" y1="18" x2="12" y2="22"/><line x1="2" y1="12" x2="6" y2="12"/><line x1="18" y1="12" x2="22" y2="12"/></svg>
+                    <span>实时追踪</span>
+                </a>
+                <a href="results.html" class="nav-item">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 20V10M12 20V4M6 20v-6"/></svg>
+                    <span>分析结果</span>
+                </a>
+
+                <div class="nav-section">管理</div>
+                <a href="videos.html" class="nav-item">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>
+                    <span>视频管理</span>
+                </a>
+                <a href="history.html" class="nav-item">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                    <span>历史记录</span>
+                </a>
+                <a href="settings.html" class="nav-item active">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
+                    <span>系统设置</span>
+                </a>
+            </nav>
+
+            <div class="sidebar-footer">
+                <div class="sidebar-user">
+                    <div class="sidebar-avatar" id="sidebar-avatar-text">L</div>
+                    <div class="sidebar-user-info">
+                        <div class="sidebar-user-name" id="sidebar-display-name">刘心宇</div>
+                        <div class="sidebar-user-role" id="sidebar-role">管理员</div>
+                    </div>
+                </div>
+                <button class="logout-btn" onclick="doLogout()" title="退出登录">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9"/></svg>
+                    <span>退出登录</span>
+                </button>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Header -->
+            <header class="top-header">
+                <div class="header-left">
+                    <button class="mobile-menu-btn" onclick="toggleSidebar()" title="菜单">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+                    </button>
+                    <div>
+                        <h2>系统设置</h2>
+                        <div class="greeting">管理系统配置与偏好</div>
+                    </div>
+                </div>
+                <div class="header-stats">
+                    <div class="header-stat"><div class="val" id="stat-today-comments">—</div><div class="lbl">今日评论</div></div>
+                    <div class="header-stat"><div class="val" id="stat-new-videos">—</div><div class="lbl">新增视频</div></div>
+                    <div class="header-stat"><div class="val" id="stat-completion">—</div><div class="lbl">分析完成</div></div>
+                    <div class="header-stat"><div class="val" id="stat-hot-topic">—</div><div class="lbl">最近热点</div></div>
+                </div>
+            </header>
+
+            <!-- Page Content -->
+            <div class="page-content active" id="content-settings">
+                <div class="settings-section">
+                    <h3>分析偏好</h3>
+                    <div class="setting-row">
+                        <div>
+                            <div class="setting-label">默认评论数量</div>
+                            <div class="setting-desc">新建分析时的默认评论抓取量</div>
+                        </div>
+                        <select id="setting-default-comment-count" style="padding:6px 12px;border:1px solid var(--border);border-radius:6px;font-size:13px;" onchange="onDefaultCommentCountChange()">
+                            <option value="500">500</option>
+                            <option value="1000">1000</option>
+                            <option value="5000">5000</option>
+                        </select>
+                    </div>
+                    <div class="setting-row">
+                        <div>
+                            <div class="setting-label">自动生成 AI 总结</div>
+                            <div class="setting-desc">分析完成后自动调用大模型生成总结报告</div>
+                        </div>
+                        <div class="toggle-switch" id="toggle-auto-ai-summary" onclick="onToggleAutoAiSummary()"></div>
+                    </div>
+                    <div class="setting-row">
+                        <div>
+                            <div class="setting-label">实时分析动画</div>
+                            <div class="setting-desc">展示 Pipeline 实时分析动画（关闭可提升性能）</div>
+                        </div>
+                        <div class="toggle-switch" id="toggle-realtime-animation" onclick="onToggleRealtimeAnimation()"></div>
+                    </div>
+                </div>
+
+                <div class="settings-section">
+                    <h3>通知设置</h3>
+                    <div class="setting-row">
+                        <div>
+                            <div class="setting-label">分析完成通知</div>
+                            <div class="setting-desc">分析完成后通过邮件/站内信通知</div>
+                        </div>
+                        <div class="toggle-switch" id="toggle-analysis-complete-notify" onclick="onToggleAnalysisCompleteNotify()"></div>
+                    </div>
+                    <div class="setting-row">
+                        <div>
+                            <div class="setting-label">异常预警</div>
+                            <div class="setting-desc">当负面情绪突增时发送预警通知</div>
+                        </div>
+                        <div class="toggle-switch" id="toggle-anomaly-alert" onclick="onToggleAnomalyAlert()"></div>
+                    </div>
+                </div>
+
+                <div class="settings-section">
+                    <h3>账户信息</h3>
+                    <div class="setting-row">
+                        <div>
+                            <div class="setting-label">用户名</div>
+                            <div class="setting-desc" id="setting-username-value">—</div>
+                        </div>
+                        <button class="btn-outline" style="font-size:12px;padding:6px 14px;" onclick="onEditUsername()">修改</button>
+                    </div>
+                    <div class="setting-row">
+                        <div>
+                            <div class="setting-label">邮箱</div>
+                            <div class="setting-desc" id="setting-email-value">—</div>
+                        </div>
+                        <button class="btn-outline" style="font-size:12px;padding:6px 14px;" onclick="onEditEmail()">修改</button>
+                    </div>
+                    <div class="setting-row">
+                        <div>
+                            <div class="setting-label">API Key</div>
+                            <div class="setting-desc" id="setting-apikey-value">—</div>
+                        </div>
+                        <button class="btn-outline" style="font-size:12px;padding:6px 14px;" onclick="onRegenerateApiKey()">重新生成</button>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Scripts -->
+    <script src="js/api.js"></script>
+    <script src="js/common.js"></script>
+    <script>
+let currentSettings = null;
+
+async function loadSettings() {
+    try {
+        currentSettings = await api.getSettings();
+
+        // Analysis preferences
+        if (currentSettings.analysis_preferences) {
+            const ap = currentSettings.analysis_preferences;
+            // Default comment count
+            const countSelect = document.getElementById('setting-default-comment-count');
+            if (ap.default_comment_count) {
+                countSelect.value = ap.default_comment_count;
+            }
+            // Toggles
+            setToggleState('toggle-auto-ai-summary', ap.auto_ai_summary);
+            setToggleState('toggle-realtime-animation', ap.realtime_animation);
+        }
+
+        // Notification preferences
+        if (currentSettings.notification_preferences) {
+            const np = currentSettings.notification_preferences;
+            setToggleState('toggle-analysis-complete-notify', np.analysis_complete_notify);
+            setToggleState('toggle-anomaly-alert', np.anomaly_alert);
+        }
+
+        // Account info
+        if (currentSettings.account) {
+            const acct = currentSettings.account;
+            setText('setting-username-value', acct.username || '—');
+            setText('setting-email-value', acct.email || '—');
+            setText('setting-apikey-value', acct.api_key_masked || '—');
+        }
+    } catch (e) {
+        console.error('loadSettings error:', e);
+        alert('加载设置失败：' + (e.message || '未知错误'));
+    }
+}
+
+function setToggleState(id, value) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    if (value) {
+        el.classList.add('on');
+    } else {
+        el.classList.remove('on');
+    }
+}
+
+// ---- Analysis preference handlers ----
+
+async function onDefaultCommentCountChange() {
+    const val = parseInt(document.getElementById('setting-default-comment-count').value);
+    try {
+        await api.updateAnalysisPreferences({ default_comment_count: val });
+    } catch (e) {
+        console.error('update analysis preferences error:', e);
+        alert('保存失败：' + (e.message || '未知错误'));
+        await loadSettings();
+    }
+}
+
+async function onToggleAutoAiSummary() {
+    const el = document.getElementById('toggle-auto-ai-summary');
+    const newVal = !el.classList.contains('on');
+    el.classList.toggle('on');
+    try {
+        await api.updateAnalysisPreferences({ auto_ai_summary: newVal });
+    } catch (e) {
+        console.error('update auto_ai_summary error:', e);
+        alert('保存失败：' + (e.message || '未知错误'));
+        await loadSettings();
+    }
+}
+
+async function onToggleRealtimeAnimation() {
+    const el = document.getElementById('toggle-realtime-animation');
+    const newVal = !el.classList.contains('on');
+    el.classList.toggle('on');
+    try {
+        await api.updateAnalysisPreferences({ realtime_animation: newVal });
+    } catch (e) {
+        console.error('update realtime_animation error:', e);
+        alert('保存失败：' + (e.message || '未知错误'));
+        await loadSettings();
+    }
+}
+
+// ---- Notification preference handlers ----
+
+async function onToggleAnalysisCompleteNotify() {
+    const el = document.getElementById('toggle-analysis-complete-notify');
+    const newVal = !el.classList.contains('on');
+    el.classList.toggle('on');
+    try {
+        await api.updateNotificationPreferences({ analysis_complete_notify: newVal });
+    } catch (e) {
+        console.error('update analysis_complete_notify error:', e);
+        alert('保存失败：' + (e.message || '未知错误'));
+        await loadSettings();
+    }
+}
+
+async function onToggleAnomalyAlert() {
+    const el = document.getElementById('toggle-anomaly-alert');
+    const newVal = !el.classList.contains('on');
+    el.classList.toggle('on');
+    try {
+        await api.updateNotificationPreferences({ anomaly_alert: newVal });
+    } catch (e) {
+        console.error('update anomaly_alert error:', e);
+        alert('保存失败：' + (e.message || '未知错误'));
+        await loadSettings();
+    }
+}
+
+// ---- Account handlers ----
+
+async function onEditUsername() {
+    const current = currentSettings && currentSettings.account ? currentSettings.account.username : '';
+    const newName = prompt('请输入新的用户名：', current);
+    if (newName === null || newName.trim() === '') return;
+    try {
+        await api.updateUsername(newName.trim());
+        await loadSettings();
+    } catch (e) {
+        console.error('update username error:', e);
+        alert('修改用户名失败：' + (e.message || '未知错误'));
+    }
+}
+
+async function onEditEmail() {
+    const current = currentSettings && currentSettings.account ? currentSettings.account.email : '';
+    const newEmail = prompt('请输入新的邮箱：', current);
+    if (newEmail === null || newEmail.trim() === '') return;
+    try {
+        await api.updateEmail(newEmail.trim());
+        await loadSettings();
+    } catch (e) {
+        console.error('update email error:', e);
+        alert('修改邮箱失败：' + (e.message || '未知错误'));
+    }
+}
+
+async function onRegenerateApiKey() {
+    if (!confirm('确定要重新生成 API Key 吗？旧的 Key 将立即失效。')) return;
+    try {
+        await api.regenerateApiKey();
+        await loadSettings();
+    } catch (e) {
+        console.error('regenerate api key error:', e);
+        alert('重新生成 API Key 失败：' + (e.message || '未知错误'));
+    }
+}
+
+// Init
+initPage().then(() => loadSettings());
+</script>
+</body>
+</html>

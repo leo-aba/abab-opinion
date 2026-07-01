@@ -1,0 +1,561 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>创建分析 — AI Video Opinion Analytics</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div class="page app-page active" id="page-app">
+
+  <!-- Sidebar overlay (mobile) -->
+  <div class="sidebar-overlay" id="sidebar-overlay" onclick="closeSidebar()"></div>
+
+  <!-- Sidebar -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-logo">
+      <img src="logo.png" alt="Opinion AI" style="width:32px;height:32px;">
+      Opinion AI
+    </div>
+    <nav class="sidebar-nav">
+      <div class="nav-section">主菜单</div>
+      <a href="dashboard.html" class="nav-item">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+        Dashboard
+      </a>
+      <a href="create-analysis.html" class="nav-item active">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 8v8M8 12h8"/></svg>
+        创建分析
+      </a>
+      <a href="pipeline.html" class="nav-item">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+        实时分析
+      </a>
+      <a href="tracking.html" class="nav-item" id="nav-tracking" style="display:none;">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="4" fill="currentColor"/><line x1="12" y1="2" x2="12" y2="6"/><line x1="12" y1="18" x2="12" y2="22"/><line x1="2" y1="12" x2="6" y2="12"/><line x1="18" y1="12" x2="22" y2="12"/></svg>
+        实时追踪
+      </a>
+      <a href="results.html" class="nav-item">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 20V10M12 20V4M6 20v-6"/></svg>
+        分析结果
+      </a>
+      <div class="nav-section">管理</div>
+      <a href="videos.html" class="nav-item">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>
+        视频管理
+      </a>
+      <a href="history.html" class="nav-item">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+        历史记录
+      </a>
+      <a href="settings.html" class="nav-item">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
+        系统设置
+      </a>
+    </nav>
+    <div class="sidebar-footer">
+      <div class="sidebar-user">
+        <div class="sidebar-avatar" id="sidebar-avatar-text">L</div>
+        <div class="sidebar-user-info">
+          <div class="sidebar-user-name" id="sidebar-display-name">加载中...</div>
+          <div class="sidebar-user-role" id="sidebar-role">—</div>
+        </div>
+      </div>
+      <button class="logout-btn" onclick="doLogout()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9"/></svg>
+        退出登录
+      </button>
+    </div>
+  </aside>
+
+  <!-- Main Content -->
+  <div class="main-content">
+    <header class="top-header">
+      <div class="header-left">
+        <button class="mobile-menu-btn" onclick="toggleSidebar()">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+        </button>
+        <h2>创建分析</h2>
+        <div class="greeting">创建新的视频评论分析任务</div>
+      </div>
+      <div class="header-stats">
+        <div class="header-stat"><div class="val" id="stat-today-comments">—</div><div class="lbl">今日评论</div></div>
+        <div class="header-stat"><div class="val" id="stat-new-videos">—</div><div class="lbl">新增视频</div></div>
+        <div class="header-stat"><div class="val" id="stat-completion">—</div><div class="lbl">分析完成</div></div>
+        <div class="header-stat"><div class="val" id="stat-hot-topic">—</div><div class="lbl">最近热点</div></div>
+      </div>
+    </header>
+
+    <!-- WIZARD CONTENT -->
+    <div class="page-content active" id="content-wizard">
+
+      <div class="wizard-container">
+
+        <!-- Step Indicator -->
+        <div class="step-indicator" style="display:flex;align-items:flex-start;">
+          <div class="step-dot" style="flex-direction:column;align-items:center;">
+            <div class="step-circle current" id="stepCircle1">1</div>
+            <div class="step-label active" id="stepLabel1">选择平台</div>
+          </div>
+          <div class="step-line" id="stepLine1" style="margin-top:17px;"></div>
+          <div class="step-dot" style="flex-direction:column;align-items:center;">
+            <div class="step-circle" id="stepCircle2">2</div>
+            <div class="step-label" id="stepLabel2">搜索视频</div>
+          </div>
+          <div class="step-line" id="stepLine2" style="margin-top:17px;"></div>
+          <div class="step-dot" style="flex-direction:column;align-items:center;">
+            <div class="step-circle" id="stepCircle3">3</div>
+            <div class="step-label" id="stepLabel3">分析参数</div>
+          </div>
+          <div class="step-line" id="stepLine3" style="margin-top:17px;"></div>
+          <div class="step-dot" style="flex-direction:column;align-items:center;">
+            <div class="step-circle" id="stepCircle4">4</div>
+            <div class="step-label" id="stepLabel4">开始分析</div>
+          </div>
+        </div>
+
+        <!-- Step 1: Platform Selection -->
+        <div class="wizard-step active" id="wizStep1">
+          <div style="text-align:center;margin-bottom:32px;">
+            <h3 style="font-size:20px;font-weight:700;color:var(--text-dark);margin-bottom:8px;">请选择平台</h3>
+            <p style="font-size:14px;color:var(--text-secondary-dark);">选择您要分析评论的视频平台</p>
+          </div>
+          <div class="platform-cards">
+            <div class="platform-card selected" id="platformBilibili" onclick="selectPlatform('bilibili')">
+              <div class="check-badge">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" width="16" height="16"><polyline points="20 6 9 17 4 12"/></svg>
+              </div>
+              <div class="platform-logo bilibili">B</div>
+              <h4>Bilibili</h4>
+              <p>B站视频评论分析</p>
+            </div>
+            <div class="platform-card" id="platformDouyin" onclick="selectPlatform('douyin')">
+              <div class="check-badge">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" width="16" height="16"><polyline points="20 6 9 17 4 12"/></svg>
+              </div>
+              <div class="platform-logo douyin">D</div>
+              <h4>抖音</h4>
+              <p>抖音短视频评论分析</p>
+            </div>
+          </div>
+          <div class="wizard-nav">
+            <div></div>
+            <button class="btn-primary" style="width:auto;padding:10px 28px;font-size:14px;" onclick="wizardNext(2)">下一步 →</button>
+          </div>
+        </div>
+
+        <!-- Step 2: Video Search -->
+        <div class="wizard-step" id="wizStep2">
+          <div style="text-align:center;margin-bottom:28px;">
+            <h3 style="font-size:20px;font-weight:700;color:var(--text-dark);margin-bottom:8px;">搜索视频</h3>
+            <p style="font-size:14px;color:var(--text-secondary-dark);">通过 URL、BV号、AV号或关键词查找视频</p>
+          </div>
+          <div class="search-tabs">
+            <button class="search-tab active" onclick="switchSearchTab(this,'url')">URL</button>
+            <button class="search-tab" onclick="switchSearchTab(this,'bv')">BV号</button>
+            <button class="search-tab" onclick="switchSearchTab(this,'av')">AV号</button>
+            <button class="search-tab" onclick="switchSearchTab(this,'keyword')">关键词</button>
+          </div>
+          <div class="search-input-row">
+            <input type="text" id="searchInput" placeholder="请输入搜索内容...">
+            <button class="btn-primary" style="width:auto;padding:10px 24px;font-size:14px;" onclick="searchVideos()">搜索</button>
+          </div>
+          <table class="video-result-table" id="videoResults">
+            <thead>
+              <tr>
+                <th>封面</th>
+                <th>标题</th>
+                <th>UP主</th>
+                <th>评论数</th>
+                <th>操作</th>
+              </tr>
+            </thead>
+            <tbody id="videoResultsBody">
+              <tr><td colspan="5" style="text-align:center;padding:40px 20px;color:var(--text-secondary-dark);">请输入搜索内容后点击搜索</td></tr>
+            </tbody>
+          </table>
+          <div class="wizard-nav">
+            <button class="btn-outline" onclick="wizardPrev(1)">← 上一步</button>
+            <button class="btn-primary" style="width:auto;padding:10px 28px;font-size:14px;" onclick="wizardNext(3)">下一步 →</button>
+          </div>
+        </div>
+
+        <!-- Step 3: Analysis Parameters -->
+        <div class="wizard-step" id="wizStep3">
+          <div style="text-align:center;margin-bottom:28px;">
+            <h3 style="font-size:20px;font-weight:700;color:var(--text-dark);margin-bottom:8px;">配置分析参数</h3>
+            <p style="font-size:14px;color:var(--text-secondary-dark);">自定义分析范围以获得精准洞察</p>
+          </div>
+
+          <div class="param-group" id="paramCount">
+            <h4>评论数量</h4>
+            <div class="param-options">
+              <button class="param-option" onclick="selectParam(this,'paramCount')">100</button>
+              <button class="param-option selected" onclick="selectParam(this,'paramCount')">500</button>
+              <button class="param-option" onclick="selectParam(this,'paramCount')">1,000</button>
+              <button class="param-option" onclick="selectParam(this,'paramCount')">5,000</button>
+              <button class="param-option" onclick="selectParam(this,'paramCount')">全部</button>
+            </div>
+          </div>
+
+          <div class="param-group" id="paramTime">
+            <h4>时间范围</h4>
+            <div class="param-options">
+              <button class="param-option selected" onclick="selectParam(this,'paramTime')">最近7天</button>
+              <button class="param-option" onclick="selectParam(this,'paramTime')">最近30天</button>
+              <button class="param-option" onclick="selectParam(this,'paramTime')">全部</button>
+            </div>
+          </div>
+
+          <div class="param-group" id="paramLang">
+            <h4>语言</h4>
+            <div class="param-options">
+              <button class="param-option selected" onclick="selectParam(this,'paramLang')">中文</button>
+              <button class="param-option" onclick="selectParam(this,'paramLang')">英文</button>
+              <button class="param-option" onclick="selectParam(this,'paramLang')">全部</button>
+            </div>
+          </div>
+
+          <div class="param-group">
+            <h4>分析模式</h4>
+            <div class="mode-cards">
+              <div class="mode-card selected" id="modeTracking" onclick="selectMode('tracking')">
+                <div class="mode-icon tracking">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="var(--orange)" stroke-width="2" width="24" height="24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                </div>
+                <div style="display:flex;align-items:center;gap:10px;">
+                  <h4>实时追踪</h4>
+                  <span class="mode-badge tracking">推荐</span>
+                </div>
+                <p>持续监控视频评论，实时推送舆情变化。适合热点追踪、舆情预警和危机公关场景。</p>
+                <div class="mode-features">
+                  <div class="mode-feature">每5分钟自动刷新评论数据</div>
+                  <div class="mode-feature">实时情感趋势追踪</div>
+                  <div class="mode-feature">异常评论激增预警</div>
+                  <div class="mode-feature">关键词触发即时通知</div>
+                </div>
+              </div>
+              <div class="mode-card" id="modeNormal" onclick="selectMode('normal')">
+                <div class="mode-icon normal">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="var(--cyan)" stroke-width="2" width="24" height="24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                </div>
+                <div style="display:flex;align-items:center;gap:10px;">
+                  <h4>普通分析</h4>
+                  <span class="mode-badge normal">一次性</span>
+                </div>
+                <p>一次性抓取并分析现有评论，生成完整分析报告。适合历史数据分析和总结性报告。</p>
+                <div class="mode-features">
+                  <div class="mode-feature">完整抓取现有评论快照</div>
+                  <div class="mode-feature">深度情感分析与分类</div>
+                  <div class="mode-feature">话题提取与关键词识别</div>
+                  <div class="mode-feature">生成可下载分析报告</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="wizard-nav">
+            <button class="btn-outline" onclick="wizardPrev(2)">← 上一步</button>
+            <button class="btn-primary" style="width:auto;padding:10px 28px;font-size:14px;" onclick="wizardNext(4)">下一步 →</button>
+          </div>
+        </div>
+
+        <!-- Step 4: Confirmation -->
+        <div class="wizard-step" id="wizStep4">
+          <div style="text-align:center;margin-bottom:28px;">
+            <h3 style="font-size:20px;font-weight:700;color:var(--text-dark);margin-bottom:8px;">确认并开始分析</h3>
+            <p style="font-size:14px;color:var(--text-secondary-dark);">检查您的分析配置</p>
+          </div>
+
+          <div class="wizard-summary">
+            <h4>分析配置摘要</h4>
+            <div class="summary-row">
+              <span class="label">平台</span>
+              <span class="value" id="summaryPlatform">Bilibili</span>
+            </div>
+            <div class="summary-row">
+              <span class="label">视频</span>
+              <span class="value" id="summaryVideo">—</span>
+            </div>
+            <div class="summary-row">
+              <span class="label">评论数量</span>
+              <span class="value" id="summaryCount">500</span>
+            </div>
+            <div class="summary-row">
+              <span class="label">时间范围</span>
+              <span class="value" id="summaryTime">最近7天</span>
+            </div>
+            <div class="summary-row">
+              <span class="label">语言</span>
+              <span class="value" id="summaryLang">中文</span>
+            </div>
+            <div class="summary-row">
+              <span class="label">分析模式</span>
+              <span class="value" id="summaryMode">实时追踪</span>
+            </div>
+          </div>
+
+          <div id="trackingWarning" style="display:flex;align-items:center;gap:10px;padding:14px 20px;border-radius:var(--radius-sm);border:1px solid var(--orange);background:var(--orange-light);margin-bottom:24px;color:var(--text-dark);font-size:13px;font-weight:500;">
+            <svg viewBox="0 0 24 24" fill="none" stroke="var(--orange)" stroke-width="2" width="18" height="18" style="flex-shrink:0;"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+            实时追踪模式将消耗系统积分。当前可用积分：<strong id="credits-available">—</strong>，预计本次分析消耗 <strong id="credits-estimated">—</strong> 积分。
+          </div>
+
+          <div style="text-align:center;">
+            <button class="btn-lg" onclick="startAnalysis()">开始分析</button>
+          </div>
+
+          <div class="wizard-nav">
+            <button class="btn-outline" onclick="wizardPrev(3)">← 上一步</button>
+            <div></div>
+          </div>
+        </div>
+
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<script src="js/api.js"></script>
+<script src="js/common.js"></script>
+<script>
+let wizardStep = 1;
+let selectedPlatform = 'bilibili';
+let selectedVideo = null;       // { title, bvid, avid, url, uploader, comment_count, cover_url }
+let selectedMode = 'tracking';
+let searchType = 'url';
+
+// ──────────────────────────────────────────────
+// Platform / Mode / Param selection (unchanged)
+// ──────────────────────────────────────────────
+
+function selectPlatform(platform) {
+  selectedPlatform = platform;
+  document.getElementById('platformBilibili').classList.remove('selected');
+  document.getElementById('platformDouyin').classList.remove('selected');
+  document.getElementById('platform' + (platform === 'bilibili' ? 'Bilibili' : 'Douyin')).classList.add('selected');
+}
+
+function selectMode(mode) {
+  selectedMode = mode;
+  document.getElementById('modeTracking').classList.remove('selected');
+  document.getElementById('modeNormal').classList.remove('selected');
+  document.getElementById(mode === 'tracking' ? 'modeTracking' : 'modeNormal').classList.add('selected');
+}
+
+function selectParam(btn, groupId) {
+  document.querySelectorAll('#' + groupId + ' .param-option').forEach(b => b.classList.remove('selected'));
+  btn.classList.add('selected');
+}
+
+// ──────────────────────────────────────────────
+// Step 2: Search
+// ──────────────────────────────────────────────
+
+function switchSearchTab(btn, type) {
+  document.querySelectorAll('#content-wizard .search-tab').forEach(t => t.classList.remove('active'));
+  btn.classList.add('active');
+  searchType = type;
+}
+
+async function searchVideos() {
+  const query = document.getElementById('searchInput').value.trim();
+  if (!query) {
+    alert('请输入搜索内容');
+    return;
+  }
+
+  const tbody = document.getElementById('videoResultsBody');
+  tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:40px 20px;color:var(--text-secondary-dark);">搜索中...</td></tr>';
+
+  try {
+    const videos = await api.searchVideos(selectedPlatform, searchType, query);
+    if (!videos || videos.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:40px 20px;color:var(--text-secondary-dark);">未找到视频</td></tr>';
+      return;
+    }
+
+    let html = '';
+    videos.forEach(function(v) {
+      const coverHtml = v.cover_url
+        ? '<img src="' + escapeHtml(v.cover_url) + '" alt="" class="video-cover" style="width:80px;height:45px;object-fit:cover;border-radius:4px;">'
+        : '<div class="video-cover" style="display:flex;align-items:center;justify-content:center;font-size:12px;color:var(--text-secondary);">封面</div>';
+      html += '<tr>' +
+        '<td>' + coverHtml + '</td>' +
+        '<td>' + escapeHtml(v.title || '—') + '</td>' +
+        '<td>' + escapeHtml(v.uploader || '—') + '</td>' +
+        '<td>' + (v.comment_count != null ? v.comment_count.toLocaleString() : '—') + '</td>' +
+        '<td><button class="btn-sm" onclick="selectVideo(this,\'' + escapeAttr(v.title) + '\',' + (v.comment_count || 0) + ')">选择</button></td>' +
+        '</tr>';
+    });
+    tbody.innerHTML = html;
+  } catch (e) {
+    tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:40px 20px;color:#e53e3e;">搜索失败：' + escapeHtml(e.message) + '</td></tr>';
+  }
+}
+
+function selectVideo(btn, title, commentCount) {
+  document.querySelectorAll('#videoResults .btn-sm.selected-btn').forEach(function(b) {
+    b.classList.remove('selected-btn');
+    b.textContent = '选择';
+  });
+  btn.classList.add('selected-btn');
+  btn.textContent = '已选择 ✓';
+  selectedVideo = {
+    title: title,
+    comment_count: commentCount
+  };
+}
+
+// ──────────────────────────────────────────────
+// Wizard navigation
+// ──────────────────────────────────────────────
+
+async function wizardNext(step) {
+  wizardStep = step;
+  showWizardStep(step);
+  updateStepIndicator(step);
+
+  if (step === 4) {
+    updateWizardSummary();
+    await loadCredits();
+  }
+}
+
+function wizardPrev(step) {
+  wizardStep = step;
+  showWizardStep(step);
+  updateStepIndicator(step);
+}
+
+function showWizardStep(step) {
+  document.querySelectorAll('.wizard-step').forEach(function(el) { el.classList.remove('active'); });
+  var target = document.getElementById('wizStep' + step);
+  if (target) target.classList.add('active');
+}
+
+function updateStepIndicator(step) {
+  for (var i = 1; i <= 4; i++) {
+    var circle = document.getElementById('stepCircle' + i);
+    var label = document.getElementById('stepLabel' + i);
+    var line = document.getElementById('stepLine' + i);
+    circle.classList.remove('current', 'done');
+    label.classList.remove('active', 'done');
+    if (i < 4 && line) line.classList.remove('done');
+    if (i < step) {
+      circle.classList.add('done');
+      circle.textContent = '✓';
+      label.classList.add('done');
+      if (i < 4 && line) line.classList.add('done');
+    } else if (i === step) {
+      circle.classList.add('current');
+      circle.textContent = i;
+      label.classList.add('active');
+    } else {
+      circle.textContent = i;
+    }
+  }
+}
+
+// ──────────────────────────────────────────────
+// Summary helpers
+// ──────────────────────────────────────────────
+
+function getSelectedParam(groupId) {
+  var el = document.querySelector('#' + groupId + ' .param-option.selected');
+  return el ? el.textContent : '—';
+}
+
+function updateWizardSummary() {
+  setText('summaryPlatform', selectedPlatform === 'bilibili' ? 'Bilibili' : '抖音');
+  setText('summaryVideo', selectedVideo ? selectedVideo.title : '—');
+  setText('summaryCount', getSelectedParam('paramCount'));
+  setText('summaryTime', getSelectedParam('paramTime'));
+  setText('summaryLang', getSelectedParam('paramLang'));
+  setText('summaryMode', selectedMode === 'tracking' ? '实时追踪' : '普通分析');
+
+  var warning = document.getElementById('trackingWarning');
+  if (warning) warning.style.display = selectedMode === 'tracking' ? 'flex' : 'none';
+}
+
+// ──────────────────────────────────────────────
+// Credits
+// ──────────────────────────────────────────────
+
+async function loadCredits() {
+  var countText = getSelectedParam('paramCount');
+  var commentCount = countText === '全部' ? 0 : parseInt(countText.replace(/,/g, '')) || 500;
+
+  setText('credits-available', '加载中...');
+  setText('credits-estimated', '加载中...');
+
+  try {
+    var credits = await api.getUserCredits(selectedMode, commentCount);
+    setText('credits-available', (credits.available || 0).toLocaleString());
+    setText('credits-estimated', (credits.estimated_cost || 0).toLocaleString());
+  } catch (e) {
+    setText('credits-available', '获取失败');
+    setText('credits-estimated', '获取失败');
+  }
+}
+
+// ──────────────────────────────────────────────
+// Start analysis
+// ──────────────────────────────────────────────
+
+async function startAnalysis() {
+  var countText = getSelectedParam('paramCount');
+  var commentCount = countText === '全部' ? 0 : parseInt(countText.replace(/,/g, '')) || 500;
+
+  var params = {
+    platform: selectedPlatform,
+    mode: selectedMode,
+    video_title: selectedVideo ? selectedVideo.title : '',
+    comment_count: commentCount,
+    time_range: getSelectedParam('paramTime'),
+    language: getSelectedParam('paramLang')
+  };
+
+  try {
+    var result = await api.createAnalysis(params);
+    sessionStorage.setItem('taskId', result.task_id);
+    sessionStorage.setItem('analysisMode', selectedMode);
+    sessionStorage.setItem('analysisPlatform', selectedPlatform);
+    sessionStorage.setItem('analysisVideo', selectedVideo ? selectedVideo.title : '');
+    window.location.href = 'pipeline.html';
+  } catch (e) {
+    alert('创建分析任务失败：' + e.message);
+  }
+}
+
+// ──────────────────────────────────────────────
+// Utility
+// ──────────────────────────────────────────────
+
+function escapeHtml(str) {
+  return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+function escapeAttr(str) {
+  return String(str).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/'/g, '&#39;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+// ──────────────────────────────────────────────
+// Init
+// ──────────────────────────────────────────────
+
+(function() {
+  // Pre-select defaults
+  selectPlatform('bilibili');
+  selectMode('tracking');
+
+  // Load user info and header stats from backend
+  initPage({ loadUser: true, loadHeaderStats: true });
+})();
+</script>
+</body>
+</html>

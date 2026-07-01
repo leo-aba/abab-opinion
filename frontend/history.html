@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>历史记录 — AI Video Opinion Analytics</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<div class="page app-page active" id="page-app">
+
+  <!-- Sidebar overlay (mobile) -->
+  <div class="sidebar-overlay" id="sidebar-overlay" onclick="closeSidebar()"></div>
+
+  <!-- Sidebar -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-logo">
+      <img src="logo.png" alt="Opinion AI" style="width:32px;height:32px;">
+      Opinion AI
+    </div>
+    <nav class="sidebar-nav">
+      <div class="nav-section">主菜单</div>
+      <a href="dashboard.html" class="nav-item">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+        Dashboard
+      </a>
+      <a href="create-analysis.html" class="nav-item">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 8v8M8 12h8"/></svg>
+        创建分析
+      </a>
+      <a href="pipeline.html" class="nav-item">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+        实时分析
+      </a>
+      <a href="tracking.html" class="nav-item" id="nav-tracking" style="display:none;">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="4" fill="currentColor"/><line x1="12" y1="2" x2="12" y2="6"/><line x1="12" y1="18" x2="12" y2="22"/><line x1="2" y1="12" x2="6" y2="12"/><line x1="18" y1="12" x2="22" y2="12"/></svg>
+        实时追踪
+      </a>
+      <a href="results.html" class="nav-item">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 20V10M12 20V4M6 20v-6"/></svg>
+        分析结果
+      </a>
+      <div class="nav-section">管理</div>
+      <a href="videos.html" class="nav-item">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>
+        视频管理
+      </a>
+      <a href="history.html" class="nav-item active">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+        历史记录
+      </a>
+      <a href="settings.html" class="nav-item">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
+        系统设置
+      </a>
+    </nav>
+    <div class="sidebar-footer">
+      <div class="sidebar-user">
+        <div class="sidebar-avatar" id="sidebar-avatar-text">L</div>
+        <div class="sidebar-user-info">
+          <div class="sidebar-user-name" id="sidebar-display-name">刘心宇</div>
+          <div class="sidebar-user-role" id="sidebar-role">管理员</div>
+        </div>
+      </div>
+      <button class="logout-btn" onclick="doLogout()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9"/></svg>
+        退出登录
+      </button>
+    </div>
+  </aside>
+
+  <!-- Main Content -->
+  <div class="main-content">
+    <!-- Header -->
+    <header class="top-header">
+      <div class="header-left">
+        <button class="mobile-menu-btn" onclick="toggleSidebar()">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+        </button>
+        <h2 id="header-title">历史记录</h2>
+        <div class="greeting" id="header-greeting">查看历史分析记录</div>
+      </div>
+      <div class="header-stats">
+        <div class="header-stat"><div class="val" id="stat-today-comments">—</div><div class="lbl">今日评论</div></div>
+        <div class="header-stat"><div class="val" id="stat-new-videos">—</div><div class="lbl">新增视频</div></div>
+        <div class="header-stat"><div class="val" id="stat-completion">—</div><div class="lbl">分析完成</div></div>
+        <div class="header-stat"><div class="val" id="stat-hot-topic">—</div><div class="lbl">最近热点</div></div>
+      </div>
+    </header>
+
+    <!-- Page Content -->
+    <div class="page-content active" id="content-history">
+      <div class="filter-bar">
+        <select id="filter-platform">
+          <option value="">全部平台</option>
+          <option value="bilibili">Bilibili</option>
+          <option value="douyin">抖音</option>
+        </select>
+        <select id="filter-time-range">
+          <option value="">全部时间</option>
+          <option value="7d">近7天</option>
+          <option value="30d">近30天</option>
+          <option value="3m">近3个月</option>
+        </select>
+        <input type="text" id="filter-keyword" placeholder="搜索视频标题...">
+        <button class="btn" style="background:var(--orange);color:var(--cream);font-size:13px;padding:8px 16px;" onclick="loadHistory(1)">筛选</button>
+      </div>
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>视频 <span class="sort-arrow">&#x2195;</span></th>
+            <th>平台</th>
+            <th>分析模式</th>
+            <th>Topic数 <span class="sort-arrow">&#x2195;</span></th>
+            <th>评论数 <span class="sort-arrow">&#x2195;</span></th>
+            <th>分析时间</th>
+            <th>操作</th>
+          </tr>
+        </thead>
+        <tbody id="history-tbody"></tbody>
+      </table>
+      <div class="pagination" id="history-pagination"></div>
+    </div>
+  </div>
+</div>
+
+<script src="js/api.js"></script>
+<script src="js/common.js"></script>
+<script>
+let currentPage = 1;
+let totalPages = 1;
+
+async function loadHistory(page) {
+    const tbody = document.getElementById('history-tbody');
+    const pagination = document.getElementById('history-pagination');
+
+    try {
+        showLoading('history-tbody');
+
+        const platform = document.getElementById('filter-platform').value;
+        const timeRange = document.getElementById('filter-time-range').value;
+        const keyword = document.getElementById('filter-keyword').value.trim();
+
+        const params = {
+            page: page || 1,
+            page_size: 20
+        };
+        if (platform) params.platform = platform;
+        if (timeRange) params.time_range = timeRange;
+        if (keyword) params.keyword = keyword;
+
+        const data = await api.getHistory(params);
+        currentPage = data.page || 1;
+        totalPages = data.total_pages || 1;
+
+        if (!data.items || data.items.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:40px;color:var(--text-secondary);">暂无历史记录</td></tr>';
+            pagination.innerHTML = '';
+            return;
+        }
+
+        let html = '';
+        for (const item of data.items) {
+            const platformBadge = item.platform === 'bilibili'
+                ? '<span style="background:var(--orange);color:var(--cream);padding:2px 8px;border-radius:10px;font-size:11px;">B站</span>'
+                : item.platform === 'douyin'
+                    ? '<span style="background:var(--cyan);color:var(--black);padding:2px 8px;border-radius:10px;font-size:11px;">抖音</span>'
+                    : '<span style="background:var(--text-secondary-dark);color:var(--cream);padding:2px 8px;border-radius:10px;font-size:11px;">' + escapeHtml(item.platform || '—') + '</span>';
+
+            const modeTag = item.analysis_mode === 'tracking'
+                ? '<span class="mode-tag tracking">实时追踪</span>'
+                : '<span class="mode-tag normal">普通分析</span>';
+
+            const statusText = item.status_label || (item.status === 'tracking' ? '运行中' : '');
+
+            html += `
+            <tr>
+                <td style="font-weight:500;">${escapeHtml(item.video_title)}</td>
+                <td>${platformBadge}</td>
+                <td>${modeTag}</td>
+                <td>${item.topic_count || 0}</td>
+                <td>${(item.comment_count || 0).toLocaleString()}</td>
+                <td>${escapeHtml(item.analyzed_at || '—')}${statusText ? ' · ' + escapeHtml(statusText) : ''}</td>
+                <td><a href="results.html?task_id=${encodeURIComponent(item.task_id)}" class="btn-sm">查看结果</a></td>
+            </tr>`;
+        }
+        tbody.innerHTML = html;
+
+        // Render pagination
+        renderPagination(pagination);
+
+    } catch (e) {
+        console.error('loadHistory error:', e);
+        showError('history-tbody', '加载历史记录失败，请重试');
+        pagination.innerHTML = '';
+    }
+}
+
+function renderPagination(container) {
+    let pagHtml = '';
+    pagHtml += '<button class="page-btn"' + (currentPage <= 1 ? ' disabled' : '') + ' onclick="loadHistory(' + (currentPage - 1) + ')">&#8592;</button>';
+
+    const maxVisible = 5;
+    let startPage = Math.max(1, currentPage - Math.floor(maxVisible / 2));
+    let endPage = Math.min(totalPages, startPage + maxVisible - 1);
+    if (endPage - startPage < maxVisible - 1) {
+        startPage = Math.max(1, endPage - maxVisible + 1);
+    }
+
+    if (startPage > 1) {
+        pagHtml += '<button class="page-btn" onclick="loadHistory(1)">1</button>';
+        if (startPage > 2) pagHtml += '<button class="page-btn" disabled>...</button>';
+    }
+
+    for (let i = startPage; i <= endPage; i++) {
+        pagHtml += '<button class="page-btn' + (i === currentPage ? ' active' : '') + '" onclick="loadHistory(' + i + ')">' + i + '</button>';
+    }
+
+    if (endPage < totalPages) {
+        if (endPage < totalPages - 1) pagHtml += '<button class="page-btn" disabled>...</button>';
+        pagHtml += '<button class="page-btn" onclick="loadHistory(' + totalPages + ')">' + totalPages + '</button>';
+    }
+
+    pagHtml += '<button class="page-btn"' + (currentPage >= totalPages ? ' disabled' : '') + ' onclick="loadHistory(' + (currentPage + 1) + ')">&#8594;</button>';
+
+    container.innerHTML = pagHtml;
+}
+
+function escapeHtml(str) {
+    if (!str) return '';
+    const div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
+}
+
+// Init
+initPage().then(() => loadHistory(1));
+</script>
+
+</body>
+</html>

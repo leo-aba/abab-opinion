@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>登录 — AI Video Opinion Analytics</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<!-- ============================================================
+     LOGIN PAGE
+     ============================================================ -->
+<div class="page active login-page" id="page-login">
+  <div class="solid-circle solid-circle-1"></div>
+  <div class="solid-circle solid-circle-2"></div>
+  <div class="solid-circle solid-circle-3"></div>
+  <div class="solid-circle solid-circle-4"></div>
+
+  <div class="login-container">
+    <!-- Left hero -->
+    <div class="login-hero">
+      <div class="login-logo">
+        <img src="logo.png" alt="Opinion AI Logo" width="40" height="40">
+        AI Opinion Analytics
+      </div>
+      <h1><span>AI 驱动</span>的<br>视频评论分析平台</h1>
+      <p class="subtitle">
+        深度分析 B站、抖音 等平台的海量评论，利用大模型与向量检索技术，自动提炼观点、识别情绪、挖掘热点。
+      </p>
+      <div class="login-features">
+        <div class="login-feature">
+          <div class="check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M5 13l4 4L19 7"/></svg></div>
+          AI 驱动的评论聚类与主题发现
+        </div>
+        <div class="login-feature">
+          <div class="check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M5 13l4 4L19 7"/></svg></div>
+          细粒度属性级情感分析
+        </div>
+        <div class="login-feature">
+          <div class="check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M5 13l4 4L19 7"/></svg></div>
+          智能评论检索与趋势洞察
+        </div>
+      </div>
+    </div>
+
+    <!-- Right card -->
+    <div class="login-card-wrapper">
+      <!-- Login Card -->
+      <div class="login-card" id="login-card">
+        <h2>欢迎回来</h2>
+        <p class="card-subtitle">登录您的账户以继续</p>
+        <div id="login-error" style="display:none; color:#ff4d4f; font-size:13px; margin-bottom:12px; padding:8px 12px; background:rgba(255,77,79,0.1); border-radius:6px;"></div>
+        <div class="form-group">
+          <label>用户名</label>
+          <input type="text" id="login-username" placeholder="请输入用户名" value="admin">
+        </div>
+        <div class="form-group">
+          <label>密码</label>
+          <input type="password" id="login-password" placeholder="请输入密码" value="password">
+        </div>
+        <div class="form-options">
+          <label><input type="checkbox" id="remember-me"> 记住我</label>
+          <a href="#">忘记密码？</a>
+        </div>
+        <button class="btn-primary" id="login-btn" onclick="doLogin()">登录</button>
+        <button class="btn-secondary" onclick="showRegister()">创建新账户</button>
+      </div>
+
+      <!-- Register Card -->
+      <div class="login-card" id="register-card" style="display:none;">
+        <h2>创建账户</h2>
+        <p class="card-subtitle">注册新账户以开始使用</p>
+        <div id="register-error" style="display:none; color:#ff4d4f; font-size:13px; margin-bottom:12px; padding:8px 12px; background:rgba(255,77,79,0.1); border-radius:6px;"></div>
+        <div class="form-group">
+          <label>用户名</label>
+          <input type="text" id="reg-username" placeholder="请输入用户名（至少3位）">
+        </div>
+        <div class="form-group">
+          <label>邮箱</label>
+          <input type="email" id="reg-email" placeholder="请输入邮箱地址">
+        </div>
+        <div class="form-group">
+          <label>密码</label>
+          <input type="password" id="reg-password" placeholder="请输入密码（至少6位）">
+        </div>
+        <div class="form-group">
+          <label>确认密码</label>
+          <input type="password" id="reg-confirm-password" placeholder="请再次输入密码">
+        </div>
+        <button class="btn-primary" id="register-btn" onclick="doRegister()">注册</button>
+        <button class="btn-secondary" onclick="showLogin()">已有账户？登录</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="js/api.js"></script>
+<script>
+function setButtonLoading(btn, loading) {
+  if (loading) {
+    btn.disabled = true;
+    btn.dataset.originalText = btn.textContent;
+    btn.textContent = '处理中...';
+    btn.style.pointerEvents = 'none';
+  } else {
+    btn.disabled = false;
+    btn.textContent = btn.dataset.originalText || btn.textContent;
+    btn.style.pointerEvents = 'auto';
+  }
+}
+
+function showError(elementId, message) {
+  const el = document.getElementById(elementId);
+  el.textContent = message;
+  el.style.display = 'block';
+}
+
+function hideError(elementId) {
+  const el = document.getElementById(elementId);
+  el.style.display = 'none';
+}
+
+async function doLogin() {
+  const btn = document.getElementById('login-btn');
+  hideError('login-error');
+
+  const username = document.getElementById('login-username').value.trim();
+  const password = document.getElementById('login-password').value;
+  const remember = document.getElementById('remember-me').checked;
+
+  if (!username || !password) {
+    showError('login-error', '请填写用户名和密码');
+    return;
+  }
+
+  setButtonLoading(btn, true);
+  try {
+    const data = await api.login(username, password, remember);
+    localStorage.setItem('token', data.token);
+    localStorage.setItem('user', JSON.stringify(data.user));
+    window.location.href = 'dashboard.html';
+  } catch (err) {
+    showError('login-error', err.message || '登录失败，请重试');
+    setButtonLoading(btn, false);
+  }
+}
+
+function showRegister() {
+  document.getElementById('login-card').style.display = 'none';
+  document.getElementById('register-card').style.display = 'block';
+}
+
+function showLogin() {
+  document.getElementById('login-card').style.display = 'block';
+  document.getElementById('register-card').style.display = 'none';
+}
+
+async function doRegister() {
+  const username = document.getElementById('reg-username').value.trim();
+  const email = document.getElementById('reg-email').value.trim();
+  const password = document.getElementById('reg-password').value;
+  const confirmPassword = document.getElementById('reg-confirm-password').value;
+
+  hideError('register-error');
+
+  if (!username || !email || !password || !confirmPassword) {
+    showError('register-error', '请填写所有字段');
+    return;
+  }
+  if (username.length < 3) {
+    showError('register-error', '用户名至少需要3位');
+    return;
+  }
+  if (password.length < 6) {
+    showError('register-error', '密码至少需要6位');
+    return;
+  }
+  if (password !== confirmPassword) {
+    showError('register-error', '两次输入的密码不一致');
+    return;
+  }
+
+  const btn = document.getElementById('register-btn');
+  setButtonLoading(btn, true);
+
+  try {
+    await api.register(username, email, password);
+    // Success: switch to login card
+    showLogin();
+    document.getElementById('login-username').value = username;
+    document.getElementById('login-password').value = '';
+    // Clear register form
+    document.getElementById('reg-username').value = '';
+    document.getElementById('reg-email').value = '';
+    document.getElementById('reg-password').value = '';
+    document.getElementById('reg-confirm-password').value = '';
+  } catch (err) {
+    showError('register-error', err.message || '注册失败，请重试');
+  } finally {
+    setButtonLoading(btn, false);
+  }
+}
+
+// Enter key support
+document.addEventListener('keydown', function(e) {
+  if (e.key === 'Enter') {
+    const regCard = document.getElementById('register-card');
+    if (regCard && regCard.style.display === 'block') {
+      doRegister();
+    } else {
+      doLogin();
+    }
+  }
+});
+</script>
+
+</body>
+</html>

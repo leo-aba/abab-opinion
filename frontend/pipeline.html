@@ -1,0 +1,633 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="AI Video Opinion Analytics — Real-time Analysis Pipeline">
+    <title>实时分析 — AI Video Opinion Analytics</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <div class="page app-page active" id="page-app">
+
+        <!-- Sidebar Overlay (mobile) -->
+        <div class="sidebar-overlay" id="sidebar-overlay" onclick="closeSidebar()"></div>
+
+        <!-- Sidebar -->
+        <aside class="sidebar" id="sidebar">
+            <div class="sidebar-logo">
+                <img src="logo.png" alt="Opinion AI Logo" style="width:32px;height:32px;">
+                Opinion AI
+            </div>
+
+            <nav class="sidebar-nav">
+                <div class="nav-section">主菜单</div>
+
+                <a href="dashboard.html" class="nav-item">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+                    Dashboard
+                </a>
+
+                <a href="create-analysis.html" class="nav-item">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 8v8M8 12h8"/></svg>
+                    创建分析
+                </a>
+
+                <a href="pipeline.html" class="nav-item active">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+                    实时分析
+                </a>
+
+                <a href="tracking.html" class="nav-item" id="nav-tracking" style="display:none;">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="4" fill="currentColor"/><line x1="12" y1="2" x2="12" y2="6"/><line x1="12" y1="18" x2="12" y2="22"/><line x1="2" y1="12" x2="6" y2="12"/><line x1="18" y1="12" x2="22" y2="12"/></svg>
+                    实时追踪
+                </a>
+
+                <a href="results.html" class="nav-item">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 20V10M12 20V4M6 20v-6"/></svg>
+                    分析结果
+                </a>
+
+                <div class="nav-section">管理</div>
+
+                <a href="videos.html" class="nav-item">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>
+                    视频管理
+                </a>
+
+                <a href="history.html" class="nav-item">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                    历史记录
+                </a>
+
+                <a href="settings.html" class="nav-item">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
+                    系统设置
+                </a>
+            </nav>
+
+            <div class="sidebar-footer">
+                <div class="sidebar-user">
+                    <div class="sidebar-avatar" id="sidebar-avatar-text">L</div>
+                    <div class="sidebar-user-info">
+                        <div class="sidebar-user-name" id="sidebar-display-name">用户</div>
+                        <div class="sidebar-user-role" id="sidebar-role">加载中...</div>
+                    </div>
+                </div>
+                <button class="logout-btn" onclick="doLogout()" title="退出登录">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9"/></svg>
+                </button>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Header -->
+            <header class="top-header">
+                <div class="header-left">
+                    <button class="mobile-menu-btn" onclick="toggleSidebar()" title="菜单">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+                    </button>
+                    <div>
+                        <h2>实时分析</h2>
+                        <div class="greeting">正在实时分析评论数据...</div>
+                    </div>
+                </div>
+            </header>
+
+            <!-- Page Content -->
+            <div class="page-content active" id="content-pipeline">
+                <div class="pipeline-layout">
+                    <div class="pipeline-main">
+                        <!-- Progress section -->
+                        <div class="progress-section">
+                            <div class="progress-header">
+                                <h3>正在分析...</h3>
+                                <span class="progress-pct" id="pipelinePct">0%</span>
+                            </div>
+                            <div class="progress-bar-track">
+                                <div class="progress-bar-fill" id="progressBar"></div>
+                            </div>
+                            <div class="progress-hint" id="progressHint">准备开始分析...</div>
+                        </div>
+
+                        <!-- Pipeline steps (dynamically rendered from API) -->
+                        <div class="pipeline-steps" id="pipelineSteps">
+                            <div style="color:var(--text-secondary);padding:20px;text-align:center;">等待服务器响应...</div>
+                        </div>
+
+                        <!-- Tracking extension (hidden initially) -->
+                        <div id="tracking-extension" style="display:none;">
+                            <div class="progress-section" style="margin-top:24px;">
+                                <div class="progress-header">
+                                    <h3 style="display:flex;align-items:center;gap:8px;"><span class="tracking-live-dot"></span> 实时追踪运行中</h3>
+                                    <span id="tracking-duration" style="font-size:14px;font-weight:600;color:var(--accent);">运行中 00:00</span>
+                                </div>
+                                <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;margin-top:12px;">
+                                    <div style="background:var(--bg);padding:14px 18px;border-radius:8px;text-align:center;">
+                                        <div style="font-size:24px;font-weight:800;color:var(--green);" id="tracking-new-comments">0</div>
+                                        <div style="font-size:11px;color:var(--text-secondary);margin-top:2px;">新增评论</div>
+                                    </div>
+                                    <div style="background:var(--bg);padding:14px 18px;border-radius:8px;text-align:center;">
+                                        <div style="font-size:24px;font-weight:800;color:var(--accent);" id="tracking-credits-left">0</div>
+                                        <div style="font-size:11px;color:var(--text-secondary);margin-top:2px;">剩余积分</div>
+                                    </div>
+                                    <div style="background:var(--bg);padding:14px 18px;border-radius:8px;text-align:center;">
+                                        <div style="font-size:24px;font-weight:800;color:var(--text);" id="tracking-total-topics">0</div>
+                                        <div style="font-size:11px;color:var(--text-secondary);margin-top:2px;">当前 Topic 数</div>
+                                    </div>
+                                </div>
+                                <div style="margin-top:14px;display:flex;align-items:center;gap:10px;">
+                                    <div style="flex:1;font-size:12px;color:var(--text-secondary);">积分消耗进度</div>
+                                    <div class="tracking-credits-bar">
+                                        <div class="tracking-credits-fill" style="width:160px;">
+                                            <div class="tracking-credits-inner" id="tracking-credits-bar" style="width:100%;"></div>
+                                        </div>
+                                        <span style="font-size:11px;font-weight:600;" id="tracking-credits-pct">100%</span>
+                                    </div>
+                                </div>
+                                <div style="margin-top:16px;display:flex;gap:12px;">
+                                    <button class="btn" style="background:var(--orange);color:var(--cream);font-size:13px;padding:8px 20px;" onclick="window.location.href='results.html'">查看实时结果</button>
+                                    <button class="btn-danger-sm" onclick="stopTracking()">停止追踪</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Log panel -->
+                    <div class="log-panel" id="logPanel">
+                        <div class="log-header">分析日志</div>
+                        <div id="logEntries">
+                            <div class="log-entry"><span class="log-time">--:--</span><span class="log-msg" style="color:#6C7086;">等待分析启动...</span></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Shared modules -->
+    <script src="js/api.js"></script>
+    <script src="js/common.js"></script>
+    <script>
+        // ============================================================
+        // State
+        // ============================================================
+        let taskId = null;
+        let selectedMode = 'normal'; // default; overridden from sessionStorage
+        let eventSource = null;
+        let pollTimer = null;
+        let trackingId = null;
+        let trackingInterval = null;
+        let trackingActive = false;
+        let trackingDuration = 0;
+        let trackingDurationTimer = null;
+
+        // ============================================================
+        // Log helpers
+        // ============================================================
+        function addLog(time, msg, type) {
+            const container = document.getElementById('logEntries');
+            const div = document.createElement('div');
+            div.className = 'log-entry';
+            const cls = type === 'error' ? ' style="color:var(--red)"' :
+                        type === 'warn' ? ' style="color:var(--orange)"' :
+                        type === 'success' ? ' style="color:var(--green)"' : '';
+            div.innerHTML = '<span class="log-time">' + time + '</span><span class="log-msg"' + cls + '>' + msg + '</span>';
+            container.appendChild(div);
+            const logPanel = document.getElementById('logPanel');
+            logPanel.scrollTop = logPanel.scrollHeight;
+        }
+
+        // ============================================================
+        // Pipeline step rendering
+        // ============================================================
+        const STEP_ICONS = [
+            '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>',
+            '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>',
+            '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>',
+            '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>',
+            '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 016.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z"/></svg>',
+            '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="4 7 4 4 20 4 20 7"/><line x1="9" y1="20" x2="15" y2="20"/><line x1="12" y1="4" x2="12" y2="20"/></svg>',
+        ];
+
+        const DONE_ICON = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M5 13l4 4L19 7"/></svg>';
+        const RUNNING_ICON = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>';
+
+        function renderPipelineSteps(steps) {
+            const container = document.getElementById('pipelineSteps');
+            if (!steps || steps.length === 0) {
+                container.innerHTML = '<div style="color:var(--text-secondary);padding:20px;text-align:center;">等待服务器响应...</div>';
+                return;
+            }
+            let html = '';
+            steps.forEach((s, i) => {
+                const iconClass = s.state || 'waiting';
+                const isLast = i === steps.length - 1;
+                const iconSvg = STEP_ICONS[i] || STEP_ICONS[0];
+                const stateLabel = iconClass === 'done' ? '已完成 ✓' :
+                                   iconClass === 'running' ? '正在运行...' : '等待中';
+                html +=
+                    '<div class="pipeline-step" id="pipeStep' + (i + 1) + '">' +
+                        '<div class="step-icon ' + iconClass + '" id="pipeIcon' + (i + 1) + '">' + iconSvg + '</div>' +
+                        '<div class="step-detail">' +
+                            '<h4>' + (s.name || '步骤 ' + (i + 1)) + '</h4>' +
+                            '<div class="step-status ' + iconClass + '" id="pipeStatus' + (i + 1) + '">' + stateLabel + '</div>' +
+                        '</div>' +
+                        (isLast ? '' : '<div class="step-connector ' + iconClass + '" id="pipeLine' + (i + 1) + '"></div>') +
+                    '</div>';
+            });
+            container.innerHTML = html;
+        }
+
+        function setPipeState(step, state) {
+            const icon = document.getElementById('pipeIcon' + step);
+            const status = document.getElementById('pipeStatus' + step);
+            const line = document.getElementById('pipeLine' + step);
+            if (icon) {
+                icon.className = 'step-icon ' + state;
+                if (state === 'done') {
+                    icon.innerHTML = DONE_ICON;
+                } else if (state === 'running') {
+                    icon.innerHTML = RUNNING_ICON;
+                } else {
+                    icon.innerHTML = STEP_ICONS[step - 1] || STEP_ICONS[0];
+                }
+            }
+            if (status) {
+                status.className = 'step-status ' + state;
+                status.textContent = state === 'done' ? '已完成 ✓' : state === 'running' ? '正在运行...' : '等待中';
+            }
+            if (line) {
+                line.className = 'step-connector ' + state;
+            }
+        }
+
+        // ============================================================
+        // SSE-based progress
+        // ============================================================
+        function connectSSE() {
+            if (!taskId) {
+                addLog(getTimeStr(), '错误: 未找到分析任务ID', 'error');
+                startPolling(); // fallback
+                return;
+            }
+
+            addLog(getTimeStr(), '正在连接实时数据流...', 'info');
+
+            try {
+                eventSource = api.createEventSource(taskId);
+
+                eventSource.addEventListener('progress', function (e) {
+                    try {
+                        const data = JSON.parse(e.data);
+                        // Update overall progress
+                        if (data.overall_pct !== undefined) {
+                            document.getElementById('pipelinePct').textContent = data.overall_pct + '%';
+                            document.getElementById('progressBar').style.width = data.overall_pct + '%';
+                        }
+                        if (data.overall_hint) {
+                            document.getElementById('progressHint').textContent = data.overall_hint;
+                        }
+                        // Update individual steps
+                        if (data.steps && Array.isArray(data.steps)) {
+                            data.steps.forEach(function (s) {
+                                setPipeState(s.step, s.state);
+                            });
+                        }
+                    } catch (err) {
+                        console.error('Failed to parse progress event:', err);
+                    }
+                });
+
+                eventSource.addEventListener('log', function (e) {
+                    try {
+                        const data = JSON.parse(e.data);
+                        addLog(data.time || getTimeStr(), data.message, data.type || 'info');
+                    } catch (err) {
+                        console.error('Failed to parse log event:', err);
+                    }
+                });
+
+                eventSource.addEventListener('complete', function (e) {
+                    addLog(getTimeStr(), '分析任务全部完成', 'success');
+                    closeSSE();
+                    if (selectedMode === 'tracking') {
+                        addLog(getTimeStr(), '--- 进入实时追踪模式 ---', 'warn');
+                        addLog(getTimeStr(), '开始监控新增评论...', 'info');
+                        initTrackingMode();
+                    } else {
+                        addLog(getTimeStr(), '即将跳转至结果页...', 'info');
+                        document.getElementById('progressHint').textContent = '分析完成！';
+                        setTimeout(function () {
+                            window.location.href = 'results.html';
+                        }, 2000);
+                    }
+                });
+
+                eventSource.addEventListener('error', function (e) {
+                    let errMsg = '服务器返回错误';
+                    try {
+                        if (e.data) {
+                            const data = JSON.parse(e.data);
+                            errMsg = data.message || errMsg;
+                        }
+                    } catch (_) {}
+                    addLog(getTimeStr(), '错误: ' + errMsg, 'error');
+                    document.getElementById('progressHint').textContent = '分析出错: ' + errMsg;
+                    closeSSE();
+                });
+
+                eventSource.onerror = function () {
+                    // SSE connection failed — fallback to polling
+                    addLog(getTimeStr(), '实时数据流连接失败，切换到轮询模式', 'warn');
+                    closeSSE();
+                    startPolling();
+                };
+            } catch (err) {
+                addLog(getTimeStr(), '无法建立实时连接，切换到轮询模式', 'warn');
+                startPolling();
+            }
+        }
+
+        function closeSSE() {
+            if (eventSource) {
+                eventSource.close();
+                eventSource = null;
+            }
+        }
+
+        // ============================================================
+        // Polling fallback
+        // ============================================================
+        function startPolling() {
+            if (!taskId) return;
+            if (pollTimer) return;
+
+            addLog(getTimeStr(), '开始轮询进度...', 'info');
+
+            async function poll() {
+                try {
+                    const progress = await api.getAnalysisProgress(taskId);
+
+                    if (progress.overall_pct !== undefined) {
+                        document.getElementById('pipelinePct').textContent = progress.overall_pct + '%';
+                        document.getElementById('progressBar').style.width = progress.overall_pct + '%';
+                    }
+                    if (progress.overall_hint) {
+                        document.getElementById('progressHint').textContent = progress.overall_hint;
+                    }
+
+                    // Render or update steps
+                    if (progress.steps && Array.isArray(progress.steps)) {
+                        if (!window._stepsRendered) {
+                            renderPipelineSteps(progress.steps);
+                            window._stepsRendered = true;
+                        }
+                        progress.steps.forEach(function (s) {
+                            setPipeState(s.step, s.state);
+                        });
+                    }
+
+                    // Process new logs
+                    if (progress.logs && Array.isArray(progress.logs)) {
+                        if (!window._logsRendered) {
+                            // Clear initial placeholder and render all logs
+                            document.getElementById('logEntries').innerHTML = '';
+                            progress.logs.forEach(function (l) {
+                                addLog(l.time || getTimeStr(), l.message, l.type || 'info');
+                            });
+                            window._logsRendered = true;
+                        } else {
+                            // Only append new logs
+                            var existingCount = window._lastLogCount || 0;
+                            for (var i = existingCount; i < progress.logs.length; i++) {
+                                var l = progress.logs[i];
+                                addLog(l.time || getTimeStr(), l.message, l.type || 'info');
+                            }
+                            window._lastLogCount = progress.logs.length;
+                        }
+                    }
+
+                    // Check completion
+                    if (progress.status === 'completed' || progress.status === 'done') {
+                        clearInterval(pollTimer);
+                        pollTimer = null;
+                        addLog(getTimeStr(), '分析任务全部完成', 'success');
+                        document.getElementById('progressHint').textContent = '分析完成！';
+
+                        if (selectedMode === 'tracking') {
+                            addLog(getTimeStr(), '--- 进入实时追踪模式 ---', 'warn');
+                            addLog(getTimeStr(), '开始监控新增评论...', 'info');
+                            initTrackingMode();
+                        } else {
+                            addLog(getTimeStr(), '即将跳转至结果页...', 'info');
+                            setTimeout(function () {
+                                window.location.href = 'results.html';
+                            }, 2000);
+                        }
+                    }
+
+                    if (progress.status === 'error' || progress.status === 'failed') {
+                        clearInterval(pollTimer);
+                        pollTimer = null;
+                        addLog(getTimeStr(), '分析失败: ' + (progress.overall_hint || '未知错误'), 'error');
+                        document.getElementById('progressHint').textContent = '分析出错';
+                    }
+                } catch (err) {
+                    console.error('Poll error:', err);
+                    // Will retry on next interval
+                }
+            }
+
+            // First immediate poll to get initial data and render steps
+            poll();
+            pollTimer = setInterval(poll, 2000);
+        }
+
+        function stopPolling() {
+            if (pollTimer) {
+                clearInterval(pollTimer);
+                pollTimer = null;
+            }
+        }
+
+        // ============================================================
+        // Tracking mode
+        // ============================================================
+        async function initTrackingMode() {
+            try {
+                const tracking = await api.startTracking(taskId);
+                trackingId = tracking.tracking_id;
+                trackingActive = true;
+
+                document.getElementById('tracking-extension').style.display = 'block';
+
+                // Show nav tracking item
+                var navTrack = document.getElementById('nav-tracking');
+                if (navTrack) navTrack.style.display = '';
+
+                // Start duration counter
+                trackingDuration = 0;
+                updateTrackingDuration();
+                trackingDurationTimer = setInterval(function () {
+                    trackingDuration++;
+                    updateTrackingDuration();
+                }, 1000);
+
+                // Set initial values
+                if (tracking.initial_credits !== undefined) {
+                    window._trackingInitialCredits = tracking.initial_credits;
+                }
+                if (tracking.credits_per_hour !== undefined) {
+                    window._trackingCreditsPerHour = tracking.credits_per_hour;
+                }
+
+                addLog(getTimeStr(), '实时追踪已启动 (ID: ' + trackingId + ')', 'success');
+
+                // Start polling tracking status
+                updateTrackingUI();
+                trackingInterval = setInterval(pollTrackingStatus, 5000);
+            } catch (err) {
+                addLog(getTimeStr(), '启动追踪失败: ' + err.message, 'error');
+                document.getElementById('progressHint').textContent = '追踪启动失败，请稍后重试';
+            }
+        }
+
+        async function pollTrackingStatus() {
+            if (!trackingActive || !trackingId) return;
+            try {
+                const status = await api.getTrackingStatus(trackingId);
+                updateTrackingUIFromData(status);
+            } catch (err) {
+                console.error('Failed to poll tracking status:', err);
+                // If we get a 404, tracking may have been stopped server-side
+                if (err.message && err.message.indexOf('404') !== -1) {
+                    addLog(getTimeStr(), '追踪已被服务器停止', 'warn');
+                    cleanupTracking();
+                }
+            }
+        }
+
+        function updateTrackingUIFromData(data) {
+            if (!data) return;
+
+            var nc = document.getElementById('tracking-new-comments');
+            if (nc && data.new_comments !== undefined) nc.textContent = data.new_comments.toLocaleString();
+
+            var cl = document.getElementById('tracking-credits-left');
+            if (cl && data.credits_remaining !== undefined) cl.textContent = Math.floor(data.credits_remaining).toLocaleString();
+
+            var tt = document.getElementById('tracking-total-topics');
+            if (tt && data.total_topics !== undefined) tt.textContent = data.total_topics;
+
+            var tc = document.getElementById('tracking-total-comments');
+            if (tc && data.total_comments !== undefined) tc.textContent = data.total_comments.toLocaleString();
+
+            // Credits bar
+            if (data.credits_remaining !== undefined && data.credits_total !== undefined && data.credits_total > 0) {
+                var pct = Math.max(0, Math.floor(data.credits_remaining / data.credits_total * 100));
+                var cb = document.getElementById('tracking-credits-bar');
+                if (cb) cb.style.width = pct + '%';
+                var cp = document.getElementById('tracking-credits-pct');
+                if (cp) cp.textContent = pct + '%';
+            }
+
+            // Auto-stop if credits exhausted
+            if (data.credits_remaining !== undefined && data.credits_remaining <= 0 && data.active === false) {
+                addLog(getTimeStr(), '积分已耗尽，追踪自动停止', 'warn');
+                cleanupTracking();
+            }
+
+            // Check if server says tracking is no longer active
+            if (data.active === false && trackingActive) {
+                addLog(getTimeStr(), '追踪已结束', 'info');
+                cleanupTracking();
+            }
+        }
+
+        function updateTrackingUI() {
+            // Update duration display
+            updateTrackingDuration();
+        }
+
+        function updateTrackingDuration() {
+            var dur = document.getElementById('tracking-duration');
+            if (dur) dur.textContent = '运行中 ' + formatDuration(trackingDuration);
+        }
+
+        async function stopTracking() {
+            if (!trackingActive) return;
+
+            try {
+                if (trackingId) {
+                    var result = await api.stopTracking(trackingId);
+                    addLog(getTimeStr(), '追踪已手动停止', 'warn');
+                    if (result.total_new_comments !== undefined) {
+                        addLog(getTimeStr(), '本次追踪共新增 ' + result.total_new_comments.toLocaleString() + ' 条评论', 'info');
+                    }
+                    if (result.credits_consumed !== undefined) {
+                        addLog(getTimeStr(), '共消耗 ' + Math.floor(result.credits_consumed).toLocaleString() + ' 积分', 'info');
+                    }
+                } else {
+                    addLog(getTimeStr(), '追踪已手动停止', 'warn');
+                }
+            } catch (err) {
+                addLog(getTimeStr(), '停止追踪请求失败: ' + err.message, 'error');
+                // Clean up UI anyway
+            }
+
+            cleanupTracking();
+        }
+
+        function cleanupTracking() {
+            trackingActive = false;
+            if (trackingInterval) { clearInterval(trackingInterval); trackingInterval = null; }
+            if (trackingDurationTimer) { clearInterval(trackingDurationTimer); trackingDurationTimer = null; }
+            document.getElementById('tracking-extension').style.display = 'none';
+            document.getElementById('progressHint').textContent = '追踪已停止。';
+        }
+
+        // ============================================================
+        // Initialization
+        // ============================================================
+        window.addEventListener('DOMContentLoaded', async function () {
+            // 1. Init page (load user, header stats)
+            initPage({ loadHeaderStats: false }).catch(function (err) {
+                console.error('initPage failed:', err);
+            });
+
+            // 2. Read task ID and mode from sessionStorage
+            taskId = sessionStorage.getItem('analysisTaskId');
+            selectedMode = sessionStorage.getItem('analysisMode') || 'normal';
+
+            if (!taskId) {
+                document.getElementById('pipelineSteps').innerHTML =
+                    '<div style="color:var(--red);padding:20px;text-align:center;">' +
+                    '错误: 未找到分析任务。请从创建分析页面开始。' +
+                    '</div>';
+                document.getElementById('progressHint').textContent = '无分析任务';
+                addLog(getTimeStr(), '错误: sessionStorage 中没有 analysisTaskId', 'error');
+                return;
+            }
+
+            addLog(getTimeStr(), '分析任务ID: ' + taskId, 'info');
+            addLog(getTimeStr(), '分析模式: ' + (selectedMode === 'tracking' ? '追踪模式' : '普通模式'), 'info');
+
+            // 3. Try SSE first; falls back to polling on failure
+            connectSSE();
+        });
+
+        // Cleanup on page unload
+        window.addEventListener('beforeunload', function () {
+            closeSSE();
+            stopPolling();
+            if (trackingInterval) clearInterval(trackingInterval);
+            if (trackingDurationTimer) clearInterval(trackingDurationTimer);
+        });
+    </script>
+</body>
+</html>

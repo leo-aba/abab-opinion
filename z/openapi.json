@@ -1,0 +1,1737 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "AI Opinion Analytics API",
+    "version": "1.0.0",
+    "description": "AI 驱动的视频评论分析平台后端接口，支持 B站/抖音 评论采集、Embedding 向量化、聚类分析、Topic 生成、AI 总结等。"
+  },
+  "servers": [
+    { "url": "http://localhost:8000", "description": "本地开发" }
+  ],
+  "security": [{ "bearerAuth": [] }],
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT"
+      }
+    },
+    "schemas": {
+      "ApiResponse": {
+        "type": "object",
+        "properties": {
+          "code": { "type": "integer", "description": "0=成功, 401=未登录, 403=权限不足, 404=资源不存在, 429=限流, 500=服务端错误" },
+          "message": { "type": "string" }
+        }
+      },
+      "UserProfile": {
+        "type": "object",
+        "properties": {
+          "user_id": { "type": "integer" },
+          "username": { "type": "string" },
+          "display_name": { "type": "string", "description": "显示名称" },
+          "role": { "type": "string", "description": "角色" },
+          "avatar_initial": { "type": "string", "description": "头像首字母" },
+          "email": { "type": "string", "format": "email" }
+        }
+      },
+      "HeaderStats": {
+        "type": "object",
+        "properties": {
+          "today_comments": { "type": "integer" },
+          "new_videos": { "type": "integer" },
+          "analysis_completion_rate": { "type": "integer" },
+          "hot_topic": { "type": "string" }
+        }
+      },
+      "TrackingActive": {
+        "type": "object",
+        "properties": {
+          "has_active": { "type": "boolean" }
+        }
+      },
+      "LoginRequest": {
+        "type": "object",
+        "required": ["username", "password"],
+        "properties": {
+          "username": { "type": "string" },
+          "password": { "type": "string" },
+          "remember": { "type": "boolean", "default": false }
+        }
+      },
+      "LoginData": {
+        "type": "object",
+        "properties": {
+          "token": { "type": "string" },
+          "user": { "$ref": "#/components/schemas/UserProfile" }
+        }
+      },
+      "RegisterRequest": {
+        "type": "object",
+        "required": ["username", "email", "password"],
+        "properties": {
+          "username": { "type": "string", "minLength": 3 },
+          "email": { "type": "string", "format": "email" },
+          "password": { "type": "string", "minLength": 6 }
+        }
+      },
+      "DashboardSummary": {
+        "type": "object",
+        "properties": {
+          "total_comments": { "type": "integer", "description": "评论总数" },
+          "total_comments_change": { "type": "integer", "description": "评论数变化百分比" },
+          "total_comments_change_direction": { "type": "string", "enum": ["up", "down"] },
+          "total_videos": { "type": "integer", "description": "视频数量" },
+          "total_videos_change": { "type": "integer" },
+          "total_videos_change_direction": { "type": "string", "enum": ["up", "down"] },
+          "hot_topic_name": { "type": "string" },
+          "hot_topic_comment_count": { "type": "integer" },
+          "avg_sentiment": { "type": "string", "description": "平均情绪" },
+          "avg_sentiment_change": { "type": "integer" },
+          "avg_sentiment_change_direction": { "type": "string", "enum": ["up", "down"] }
+        }
+      },
+      "TrendData": {
+        "type": "object",
+        "properties": {
+          "labels": { "type": "array", "items": { "type": "string" } },
+          "values": { "type": "array", "items": { "type": "number" } }
+        }
+      },
+      "SentimentRatio": {
+        "type": "object",
+        "properties": {
+          "positive": { "type": "number" },
+          "negative": { "type": "number" },
+          "neutral": { "type": "number" }
+        }
+      },
+      "TopicItem": {
+        "type": "object",
+        "properties": {
+          "topic_name": { "type": "string" },
+          "comment_count": { "type": "integer" }
+        }
+      },
+      "TrackingTask": {
+        "type": "object",
+        "properties": {
+          "task_id": { "type": "integer" },
+          "video_title": { "type": "string" },
+          "platform": { "type": "string", "enum": ["bilibili", "douyin"] },
+          "author": { "type": "string" },
+          "new_comments": { "type": "integer" },
+          "credits_remaining": { "type": "integer" },
+          "duration_seconds": { "type": "integer" }
+        }
+      },
+      "VideoSearchItem": {
+        "type": "object",
+        "properties": {
+          "video_id": { "type": "string" },
+          "cover_url": { "type": "string" },
+          "title": { "type": "string" },
+          "author": { "type": "string" },
+          "publish_date": { "type": "string" },
+          "comment_count": { "type": "integer" }
+        }
+      },
+      "CreditsInfo": {
+        "type": "object",
+        "properties": {
+          "available": { "type": "integer" },
+          "estimated_cost": { "type": "integer" },
+          "cost_unit": { "type": "string" },
+          "can_afford": { "type": "boolean" }
+        }
+      },
+      "CreateAnalysisRequest": {
+        "type": "object",
+        "required": ["platform", "video_id", "analysis_mode"],
+        "properties": {
+          "platform": { "type": "string", "enum": ["bilibili", "douyin"] },
+          "video_id": { "type": "string" },
+          "comment_count": { "type": "string", "enum": ["100", "500", "1000", "5000", "all"], "default": "500" },
+          "time_range": { "type": "string", "enum": ["recent_7_days", "recent_30_days", "all"], "default": "recent_7_days" },
+          "language": { "type": "string", "enum": ["zh", "en", "all"], "default": "zh" },
+          "analysis_mode": { "type": "string", "enum": ["tracking", "normal"] }
+        }
+      },
+      "CreateAnalysisData": {
+        "type": "object",
+        "properties": {
+          "task_id": { "type": "integer" },
+          "status": { "type": "string" },
+          "message": { "type": "string" }
+        }
+      },
+      "PipelineProgress": {
+        "type": "object",
+        "properties": {
+          "task_id": { "type": "integer" },
+          "status": { "type": "string" },
+          "overall_pct": { "type": "integer" },
+          "overall_hint": { "type": "string" },
+          "steps": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "step": { "type": "integer" },
+                "name": { "type": "string" },
+                "state": { "type": "string", "enum": ["waiting", "running", "done"] }
+              }
+            }
+          },
+          "logs": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "time": { "type": "string" },
+                "message": { "type": "string" },
+                "type": { "type": "string", "enum": ["success", "info", "warn"] }
+              }
+            }
+          }
+        }
+      },
+      "StartTrackingData": {
+        "type": "object",
+        "properties": {
+          "tracking_id": { "type": "integer" },
+          "initial_credits": { "type": "integer" },
+          "credits_per_hour": { "type": "integer" },
+          "estimated_hours": { "type": "number" }
+        }
+      },
+      "TrackingStatus": {
+        "type": "object",
+        "properties": {
+          "tracking_id": { "type": "integer" },
+          "active": { "type": "boolean" },
+          "duration_seconds": { "type": "integer" },
+          "new_comments": { "type": "integer" },
+          "credits_remaining": { "type": "integer" },
+          "credits_total": { "type": "integer" },
+          "total_topics": { "type": "integer" },
+          "total_comments": { "type": "integer" }
+        }
+      },
+      "StopTrackingData": {
+        "type": "object",
+        "properties": {
+          "tracking_id": { "type": "integer" },
+          "stopped_at": { "type": "string" },
+          "total_new_comments": { "type": "integer" },
+          "credits_consumed": { "type": "integer" }
+        }
+      },
+      "TrackingTaskFull": {
+        "type": "object",
+        "properties": {
+          "tracking_id": { "type": "integer" },
+          "task_id": { "type": "integer" },
+          "video_title": { "type": "string" },
+          "platform": { "type": "string" },
+          "author": { "type": "string" },
+          "analysis_finished_at": { "type": "string" },
+          "status": { "type": "string" },
+          "new_comments": { "type": "integer" },
+          "total_comments": { "type": "integer" },
+          "credits_remaining": { "type": "integer" },
+          "duration_seconds": { "type": "integer" },
+          "total_topics": { "type": "integer" },
+          "recent_logs": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "time": { "type": "string" },
+                "message": { "type": "string" }
+              }
+            }
+          }
+        }
+      },
+      "ResultsOverview": {
+        "type": "object",
+        "properties": {
+          "video_title": { "type": "string" },
+          "total_comments": { "type": "integer" },
+          "topic_count": { "type": "integer" },
+          "positive_pct": { "type": "number" },
+          "negative_pct": { "type": "number" },
+          "neutral_pct": { "type": "number" },
+          "analysis_time": { "type": "string" },
+          "elapsed_seconds": { "type": "number" }
+        }
+      },
+      "TopicDetail": {
+        "type": "object",
+        "properties": {
+          "topic_name": { "type": "string" },
+          "comment_count": { "type": "integer" },
+          "percentage": { "type": "number" },
+          "sample_comments": { "type": "array", "items": { "type": "string" } },
+          "keywords": { "type": "array", "items": { "type": "string" } },
+          "ai_summary": { "type": "string" }
+        }
+      },
+      "SentimentAttribute": {
+        "type": "object",
+        "properties": {
+          "sunburst": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "label": { "type": "string" },
+                "value": { "type": "number" },
+                "color": { "type": "string" }
+              }
+            }
+          },
+          "radar": {
+            "type": "object",
+            "properties": {
+              "labels": { "type": "array", "items": { "type": "string" } },
+              "positive_scores": { "type": "array", "items": { "type": "number" } },
+              "negative_scores": { "type": "array", "items": { "type": "number" } }
+            }
+          }
+        }
+      },
+      "TrendsDetail": {
+        "type": "object",
+        "properties": {
+          "labels": { "type": "array", "items": { "type": "string" } },
+          "datasets": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "label": { "type": "string" },
+                "values": { "type": "array", "items": { "type": "number" } },
+                "color": { "type": "string" }
+              }
+            }
+          }
+        }
+      },
+      "AISummary": {
+        "type": "object",
+        "properties": {
+          "title": { "type": "string" },
+          "summary_text": { "type": "string" },
+          "highlights": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "label": { "type": "string" },
+                "text": { "type": "string" }
+              }
+            }
+          }
+        }
+      },
+      "CommentSearchResult": {
+        "type": "object",
+        "properties": {
+          "total": { "type": "integer" },
+          "page": { "type": "integer" },
+          "page_size": { "type": "integer" },
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "comment_id": { "type": "integer" },
+                "text": { "type": "string" },
+                "highlighted_text": { "type": "string", "description": "关键词用 <em> 包裹" },
+                "platform": { "type": "string" },
+                "user_name": { "type": "string" },
+                "time_ago": { "type": "string" },
+                "likes": { "type": "integer" },
+                "topic": { "type": "string" }
+              }
+            }
+          }
+        }
+      },
+      "ResultsTrackingStatus": {
+        "type": "object",
+        "properties": {
+          "is_tracking": { "type": "boolean" },
+          "new_comments": { "type": "integer" },
+          "total_comments": { "type": "integer" },
+          "credits_remaining": { "type": "integer" },
+          "duration_seconds": { "type": "integer" },
+          "duration_formatted": { "type": "string" }
+        }
+      },
+      "VideoItem": {
+        "type": "object",
+        "properties": {
+          "video_id": { "type": "string" },
+          "cover_url": { "type": "string" },
+          "title": { "type": "string" },
+          "author": { "type": "string" },
+          "platform": { "type": "string", "enum": ["bilibili", "douyin"] },
+          "comment_count": { "type": "integer" },
+          "publish_date": { "type": "string" },
+          "analysis_status": { "type": "string", "enum": ["tracking", "analyzed", "analyzing", "pending"] },
+          "new_comments_since_tracking": { "type": "integer" },
+          "last_analysis_date": { "type": "string" }
+        }
+      },
+      "VideoListData": {
+        "type": "object",
+        "properties": {
+          "total": { "type": "integer" },
+          "page": { "type": "integer" },
+          "page_size": { "type": "integer" },
+          "items": { "type": "array", "items": { "$ref": "#/components/schemas/VideoItem" } }
+        }
+      },
+      "HistoryItem": {
+        "type": "object",
+        "properties": {
+          "task_id": { "type": "integer" },
+          "video_title": { "type": "string" },
+          "platform": { "type": "string", "enum": ["bilibili", "douyin"] },
+          "analysis_mode": { "type": "string", "enum": ["tracking", "normal"] },
+          "analyzed_at": { "type": "string" },
+          "topic_count": { "type": "integer" },
+          "comment_count": { "type": "integer" },
+          "status": { "type": "string", "enum": ["running", "completed", "stopped"] },
+          "status_label": { "type": "string" }
+        }
+      },
+      "HistoryListData": {
+        "type": "object",
+        "properties": {
+          "total": { "type": "integer" },
+          "page": { "type": "integer" },
+          "page_size": { "type": "integer" },
+          "total_pages": { "type": "integer" },
+          "items": { "type": "array", "items": { "$ref": "#/components/schemas/HistoryItem" } }
+        }
+      },
+      "SettingsData": {
+        "type": "object",
+        "properties": {
+          "analysis_preferences": {
+            "type": "object",
+            "properties": {
+              "default_comment_count": { "type": "integer" },
+              "auto_ai_summary": { "type": "boolean" },
+              "realtime_animation": { "type": "boolean" }
+            }
+          },
+          "notification_preferences": {
+            "type": "object",
+            "properties": {
+              "analysis_complete_notify": { "type": "boolean" },
+              "anomaly_alert": { "type": "boolean" }
+            }
+          },
+          "account": {
+            "type": "object",
+            "properties": {
+              "username": { "type": "string" },
+              "email": { "type": "string" },
+              "api_key_masked": { "type": "string" }
+            }
+          }
+        }
+      },
+      "AnalysisPreferences": {
+        "type": "object",
+        "properties": {
+          "default_comment_count": { "type": "integer" },
+          "auto_ai_summary": { "type": "boolean" },
+          "realtime_animation": { "type": "boolean" }
+        }
+      },
+      "NotificationPreferences": {
+        "type": "object",
+        "properties": {
+          "analysis_complete_notify": { "type": "boolean" },
+          "anomaly_alert": { "type": "boolean" }
+        }
+      },
+      "UpdateUsernameRequest": {
+        "type": "object",
+        "required": ["username"],
+        "properties": {
+          "username": { "type": "string" }
+        }
+      },
+      "UpdateEmailRequest": {
+        "type": "object",
+        "required": ["email"],
+        "properties": {
+          "email": { "type": "string", "format": "email" }
+        }
+      },
+      "ApiKeyData": {
+        "type": "object",
+        "properties": {
+          "api_key": { "type": "string" },
+          "api_key_masked": { "type": "string" }
+        }
+      }
+    }
+  },
+  "tags": [
+    { "name": "通用", "description": "所有页面共用的接口" },
+    { "name": "认证", "description": "登录注册" },
+    { "name": "Dashboard", "description": "仪表盘首页" },
+    { "name": "创建分析", "description": "分析任务创建向导" },
+    { "name": "实时分析", "description": "Pipeline 进度与追踪" },
+    { "name": "实时追踪", "description": "追踪任务管理" },
+    { "name": "分析结果", "description": "结果查看（6个标签页）" },
+    { "name": "视频管理", "description": "视频卡片列表" },
+    { "name": "历史记录", "description": "历史分析记录" },
+    { "name": "系统设置", "description": "偏好与账户设置" }
+  ],
+  "paths": {
+    "/api/user/profile": {
+      "get": {
+        "tags": ["通用"],
+        "summary": "获取当前用户信息",
+        "description": "侧边栏底部显示用户头像、姓名、角色",
+        "security": [{ "bearerAuth": [] }],
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/ApiResponse" },
+                    { "type": "object", "properties": { "data": { "$ref": "#/components/schemas/UserProfile" } } }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/stats/header": {
+      "get": {
+        "tags": ["通用"],
+        "summary": "获取顶部统计数字",
+        "description": "所有 app 页面顶部显示的 4 个统计数字",
+        "security": [{ "bearerAuth": [] }],
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/ApiResponse" },
+                    { "type": "object", "properties": { "data": { "$ref": "#/components/schemas/HeaderStats" } } }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/tracking/has-active": {
+      "get": {
+        "tags": ["通用"],
+        "summary": "检查是否有活跃追踪",
+        "description": "控制侧边栏\"实时追踪\"菜单项显隐和红点",
+        "security": [{ "bearerAuth": [] }],
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/ApiResponse" },
+                    { "type": "object", "properties": { "data": { "$ref": "#/components/schemas/TrackingActive" } } }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/login": {
+      "post": {
+        "tags": ["认证"],
+        "summary": "用户登录",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/LoginRequest" },
+              "example": {
+                "username": "admin",
+                "password": "password",
+                "remember": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "登录成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/ApiResponse" },
+                    { "type": "object", "properties": { "data": { "$ref": "#/components/schemas/LoginData" } } }
+                  ]
+                },
+                "example": {
+                  "code": 0,
+                  "data": {
+                    "token": "eyJhbGciOiJIUzI1NiIs...",
+                    "user": { "user_id": 1, "username": "admin", "display_name": "刘心宇", "role": "管理员", "avatar_initial": "L" }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "用户名或密码错误",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ApiResponse" },
+                "example": { "code": 401, "message": "用户名或密码错误" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/register": {
+      "post": {
+        "tags": ["认证"],
+        "summary": "用户注册",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/RegisterRequest" },
+              "example": {
+                "username": "newuser",
+                "email": "user@example.com",
+                "password": "123456"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "注册成功",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ApiResponse" },
+                "example": { "code": 0, "message": "注册成功" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/dashboard/summary": {
+      "get": {
+        "tags": ["Dashboard"],
+        "summary": "仪表盘统计卡片",
+        "description": "4 个 stat-card：评论总数、视频数量、热门Topic、平均情绪",
+        "security": [{ "bearerAuth": [] }],
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/ApiResponse" },
+                    { "type": "object", "properties": { "data": { "$ref": "#/components/schemas/DashboardSummary" } } }
+                  ]
+                },
+                "example": {
+                  "code": 0,
+                  "data": {
+                    "total_comments": 123221,
+                    "total_comments_change": 12,
+                    "total_comments_change_direction": "up",
+                    "total_videos": 421,
+                    "total_videos_change": 8,
+                    "total_videos_change_direction": "up",
+                    "hot_topic_name": "AI",
+                    "hot_topic_comment_count": 2341,
+                    "avg_sentiment": "Positive",
+                    "avg_sentiment_change": 5,
+                    "avg_sentiment_change_direction": "up"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/dashboard/trend": {
+      "get": {
+        "tags": ["Dashboard"],
+        "summary": "评论增长趋势",
+        "description": "近 N 天的评论增长曲线",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          {
+            "name": "days",
+            "in": "query",
+            "required": false,
+            "schema": { "type": "integer", "default": 30 },
+            "description": "天数"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/ApiResponse" },
+                    { "type": "object", "properties": { "data": { "$ref": "#/components/schemas/TrendData" } } }
+                  ]
+                },
+                "example": {
+                  "code": 0,
+                  "data": {
+                    "labels": ["6/1", "6/2", "6/3"],
+                    "values": [120, 145, 168]
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/dashboard/sentiment-ratio": {
+      "get": {
+        "tags": ["Dashboard"],
+        "summary": "情绪占比",
+        "description": "正面/负面/中性评论占比",
+        "security": [{ "bearerAuth": [] }],
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/ApiResponse" },
+                    { "type": "object", "properties": { "data": { "$ref": "#/components/schemas/SentimentRatio" } } }
+                  ]
+                },
+                "example": {
+                  "code": 0,
+                  "data": { "positive": 72, "negative": 18, "neutral": 10 }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/dashboard/top-topics": {
+      "get": {
+        "tags": ["Dashboard"],
+        "summary": "TOP10 热门 Topic",
+        "description": "按评论数量排序的热门话题",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": { "type": "integer", "default": 10 },
+            "description": "返回数量"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/ApiResponse" },
+                    { "type": "object", "properties": { "data": { "type": "array", "items": { "$ref": "#/components/schemas/TopicItem" } } } }
+                  ]
+                },
+                "example": {
+                  "code": 0,
+                  "data": [
+                    { "topic_name": "价格", "comment_count": 2334 },
+                    { "topic_name": "AI功能", "comment_count": 1892 }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/dashboard/active-tracking": {
+      "get": {
+        "tags": ["Dashboard"],
+        "summary": "活跃追踪任务",
+        "description": "Dashboard 上显示当前运行的追踪任务摘要",
+        "security": [{ "bearerAuth": [] }],
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/ApiResponse" },
+                    { "type": "object", "properties": { "data": { "type": "array", "items": { "$ref": "#/components/schemas/TrackingTask" } } } }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/videos/search": {
+      "get": {
+        "tags": ["创建分析"],
+        "summary": "搜索视频",
+        "description": "按 URL / BV号 / AV号 / 关键词搜索视频",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          {
+            "name": "platform",
+            "in": "query",
+            "required": true,
+            "schema": { "type": "string", "enum": ["bilibili", "douyin"] },
+            "description": "平台"
+          },
+          {
+            "name": "type",
+            "in": "query",
+            "required": true,
+            "schema": { "type": "string", "enum": ["url", "bv", "av", "keyword"] },
+            "description": "搜索类型"
+          },
+          {
+            "name": "query",
+            "in": "query",
+            "required": true,
+            "schema": { "type": "string" },
+            "description": "搜索内容"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/ApiResponse" },
+                    { "type": "object", "properties": { "data": { "type": "array", "items": { "$ref": "#/components/schemas/VideoSearchItem" } } } }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/user/credits": {
+      "get": {
+        "tags": ["创建分析"],
+        "summary": "查询积分",
+        "description": "确认页显示当前可用积分和预估消耗",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          {
+            "name": "analysis_mode",
+            "in": "query",
+            "required": true,
+            "schema": { "type": "string", "enum": ["tracking", "normal"] }
+          },
+          {
+            "name": "comment_count",
+            "in": "query",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/ApiResponse" },
+                    { "type": "object", "properties": { "data": { "$ref": "#/components/schemas/CreditsInfo" } } }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/analysis/create": {
+      "post": {
+        "tags": ["创建分析"],
+        "summary": "创建分析任务",
+        "security": [{ "bearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/CreateAnalysisRequest" },
+              "example": {
+                "platform": "bilibili",
+                "video_id": "BV1xx411c7mD",
+                "comment_count": "500",
+                "time_range": "recent_7_days",
+                "language": "zh",
+                "analysis_mode": "tracking"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "创建成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/ApiResponse" },
+                    { "type": "object", "properties": { "data": { "$ref": "#/components/schemas/CreateAnalysisData" } } }
+                  ]
+                },
+                "example": {
+                  "code": 0,
+                  "data": { "task_id": 42, "status": "queued", "message": "分析任务已创建，即将开始处理" }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/analysis/{task_id}/stream": {
+      "get": {
+        "tags": ["实时分析"],
+        "summary": "SSE 实时进度流",
+        "description": "通过 Server-Sent Events 实时推送分析进度。事件类型: progress / log / complete / error",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          {
+            "name": "task_id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "integer" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "SSE 事件流（text/event-stream）",
+            "content": {
+              "text/event-stream": {
+                "schema": { "type": "string" },
+                "example": "event: progress\ndata: {\"step\":1,\"step_name\":\"评论采集\",\"step_state\":\"running\",\"pct\":15,\"hint\":\"正在执行: 评论采集...\"}\n\nevent: complete\ndata: {\"total_comments\":52341,\"total_topics\":18,\"elapsed_seconds\":8.2,\"mode\":\"tracking\"}"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/analysis/{task_id}/progress": {
+      "get": {
+        "tags": ["实时分析"],
+        "summary": "轮询进度（SSE 备选）",
+        "description": "当 SSE 不可用时，轮询此接口获取进度",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          {
+            "name": "task_id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "integer" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/ApiResponse" },
+                    { "type": "object", "properties": { "data": { "$ref": "#/components/schemas/PipelineProgress" } } }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/analysis/{task_id}/start-tracking": {
+      "post": {
+        "tags": ["实时分析"],
+        "summary": "启动追踪模式",
+        "description": "分析完成后自动进入追踪",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          {
+            "name": "task_id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "integer" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/ApiResponse" },
+                    { "type": "object", "properties": { "data": { "$ref": "#/components/schemas/StartTrackingData" } } }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/tracking/{tracking_id}/status": {
+      "get": {
+        "tags": ["实时分析", "实时追踪"],
+        "summary": "查询追踪状态",
+        "description": "轮询追踪实时数据（每 3-5 秒）",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          {
+            "name": "tracking_id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "integer" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/ApiResponse" },
+                    { "type": "object", "properties": { "data": { "$ref": "#/components/schemas/TrackingStatus" } } }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/tracking/{tracking_id}/stop": {
+      "post": {
+        "tags": ["实时分析", "实时追踪", "分析结果"],
+        "summary": "停止追踪",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          {
+            "name": "tracking_id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "integer" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/ApiResponse" },
+                    { "type": "object", "properties": { "data": { "$ref": "#/components/schemas/StopTrackingData" } } }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/tracking/tasks": {
+      "get": {
+        "tags": ["实时追踪"],
+        "summary": "追踪任务列表",
+        "security": [{ "bearerAuth": [] }],
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/ApiResponse" },
+                    { "type": "object", "properties": { "data": { "type": "array", "items": { "$ref": "#/components/schemas/TrackingTaskFull" } } } }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/results/{task_id}/overview": {
+      "get": {
+        "tags": ["分析结果"],
+        "summary": "结果概览",
+        "description": "概览标签页：评论总数、Topic数、情感占比、分析时间",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          {
+            "name": "task_id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "integer" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/ApiResponse" },
+                    { "type": "object", "properties": { "data": { "$ref": "#/components/schemas/ResultsOverview" } } }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/results/{task_id}/trend": {
+      "get": {
+        "tags": ["分析结果"],
+        "summary": "结果页评论趋势",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          {
+            "name": "task_id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "integer" }
+          },
+          {
+            "name": "granularity",
+            "in": "query",
+            "required": false,
+            "schema": { "type": "string", "enum": ["day", "hour", "week"], "default": "day" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/ApiResponse" },
+                    { "type": "object", "properties": { "data": { "$ref": "#/components/schemas/TrendData" } } }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/results/{task_id}/sentiment-ratio": {
+      "get": {
+        "tags": ["分析结果"],
+        "summary": "结果页情绪占比",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          {
+            "name": "task_id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "integer" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/ApiResponse" },
+                    { "type": "object", "properties": { "data": { "$ref": "#/components/schemas/SentimentRatio" } } }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/results/{task_id}/topics": {
+      "get": {
+        "tags": ["分析结果"],
+        "summary": "Topic 列表",
+        "description": "Topic 聚类标签页左侧列表",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          {
+            "name": "task_id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "integer" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/ApiResponse" },
+                    { "type": "object", "properties": { "data": { "type": "array", "items": { "$ref": "#/components/schemas/TopicItem" } } } }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/results/{task_id}/topic/{topic_name}/detail": {
+      "get": {
+        "tags": ["分析结果"],
+        "summary": "Topic 详情",
+        "description": "选择某个 Topic 后显示详情",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          {
+            "name": "task_id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "integer" }
+          },
+          {
+            "name": "topic_name",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" },
+            "description": "Topic 名称（中文需 URL 编码）"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/ApiResponse" },
+                    { "type": "object", "properties": { "data": { "$ref": "#/components/schemas/TopicDetail" } } }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/results/{task_id}/sentiment-attribute": {
+      "get": {
+        "tags": ["分析结果"],
+        "summary": "属性情感数据",
+        "description": "属性情感标签页：旭日图 + 雷达图数据",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          {
+            "name": "task_id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "integer" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/ApiResponse" },
+                    { "type": "object", "properties": { "data": { "$ref": "#/components/schemas/SentimentAttribute" } } }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/results/{task_id}/trends-detail": {
+      "get": {
+        "tags": ["分析结果"],
+        "summary": "时间趋势详情",
+        "description": "时间趋势标签页：按天/小时/周的趋势线",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          {
+            "name": "task_id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "integer" }
+          },
+          {
+            "name": "granularity",
+            "in": "query",
+            "required": false,
+            "schema": { "type": "string", "enum": ["day", "hour", "week"], "default": "day" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/ApiResponse" },
+                    { "type": "object", "properties": { "data": { "$ref": "#/components/schemas/TrendsDetail" } } }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/results/{task_id}/ai-summary": {
+      "get": {
+        "tags": ["分析结果"],
+        "summary": "AI 总结",
+        "description": "AI 总结标签页：大模型生成的分析报告",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          {
+            "name": "task_id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "integer" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/ApiResponse" },
+                    { "type": "object", "properties": { "data": { "$ref": "#/components/schemas/AISummary" } } }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/results/{task_id}/comments/search": {
+      "get": {
+        "tags": ["分析结果"],
+        "summary": "评论检索",
+        "description": "评论检索标签页：按关键词搜索评论",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          {
+            "name": "task_id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "integer" }
+          },
+          {
+            "name": "keyword",
+            "in": "query",
+            "required": false,
+            "schema": { "type": "string" },
+            "description": "搜索关键词"
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": { "type": "integer", "default": 1 }
+          },
+          {
+            "name": "page_size",
+            "in": "query",
+            "required": false,
+            "schema": { "type": "integer", "default": 20 }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/ApiResponse" },
+                    { "type": "object", "properties": { "data": { "$ref": "#/components/schemas/CommentSearchResult" } } }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/results/{task_id}/tracking-status": {
+      "get": {
+        "tags": ["分析结果"],
+        "summary": "结果页追踪状态条",
+        "description": "当追踪模式时显示在结果页顶部的状态条",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          {
+            "name": "task_id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "integer" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/ApiResponse" },
+                    { "type": "object", "properties": { "data": { "$ref": "#/components/schemas/ResultsTrackingStatus" } } }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/videos": {
+      "get": {
+        "tags": ["视频管理"],
+        "summary": "视频列表",
+        "description": "视频管理页面的卡片网格",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": { "type": "integer", "default": 1 }
+          },
+          {
+            "name": "page_size",
+            "in": "query",
+            "required": false,
+            "schema": { "type": "integer", "default": 20 }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/ApiResponse" },
+                    { "type": "object", "properties": { "data": { "$ref": "#/components/schemas/VideoListData" } } }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/history": {
+      "get": {
+        "tags": ["历史记录"],
+        "summary": "历史记录列表",
+        "description": "支持筛选、排序、分页",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          {
+            "name": "platform",
+            "in": "query",
+            "required": false,
+            "schema": { "type": "string", "enum": ["bilibili", "douyin"] },
+            "description": "平台筛选"
+          },
+          {
+            "name": "time_range",
+            "in": "query",
+            "required": false,
+            "schema": { "type": "string", "enum": ["recent_7d", "recent_30d", "recent_3m"] },
+            "description": "时间范围"
+          },
+          {
+            "name": "keyword",
+            "in": "query",
+            "required": false,
+            "schema": { "type": "string" },
+            "description": "搜索视频标题"
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": { "type": "integer", "default": 1 }
+          },
+          {
+            "name": "page_size",
+            "in": "query",
+            "required": false,
+            "schema": { "type": "integer", "default": 10 }
+          },
+          {
+            "name": "sort_by",
+            "in": "query",
+            "required": false,
+            "schema": { "type": "string", "enum": ["video_title", "topic_count", "comment_count", "analysis_time"] }
+          },
+          {
+            "name": "sort_order",
+            "in": "query",
+            "required": false,
+            "schema": { "type": "string", "enum": ["asc", "desc"], "default": "desc" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/ApiResponse" },
+                    { "type": "object", "properties": { "data": { "$ref": "#/components/schemas/HistoryListData" } } }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/settings": {
+      "get": {
+        "tags": ["系统设置"],
+        "summary": "获取设置",
+        "security": [{ "bearerAuth": [] }],
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/ApiResponse" },
+                    { "type": "object", "properties": { "data": { "$ref": "#/components/schemas/SettingsData" } } }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/settings/analysis-preferences": {
+      "put": {
+        "tags": ["系统设置"],
+        "summary": "更新分析偏好",
+        "security": [{ "bearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/AnalysisPreferences" },
+              "example": {
+                "default_comment_count": 1000,
+                "auto_ai_summary": false,
+                "realtime_animation": true
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ApiResponse" },
+                "example": { "code": 0, "message": "保存成功" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/settings/notification-preferences": {
+      "put": {
+        "tags": ["系统设置"],
+        "summary": "更新通知偏好",
+        "security": [{ "bearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/NotificationPreferences" },
+              "example": {
+                "analysis_complete_notify": true,
+                "anomaly_alert": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ApiResponse" },
+                "example": { "code": 0, "message": "保存成功" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/user/username": {
+      "put": {
+        "tags": ["系统设置"],
+        "summary": "修改用户名",
+        "security": [{ "bearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/UpdateUsernameRequest" },
+              "example": { "username": "new_admin_name" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ApiResponse" },
+                "example": { "code": 0, "message": "用户名修改成功" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/user/email": {
+      "put": {
+        "tags": ["系统设置"],
+        "summary": "修改邮箱",
+        "security": [{ "bearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/UpdateEmailRequest" },
+              "example": { "email": "newemail@example.com" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ApiResponse" },
+                "example": { "code": 0, "message": "邮箱修改成功" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/user/api-key/regenerate": {
+      "post": {
+        "tags": ["系统设置"],
+        "summary": "重新生成 API Key",
+        "security": [{ "bearerAuth": [] }],
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/ApiResponse" },
+                    { "type": "object", "properties": { "data": { "$ref": "#/components/schemas/ApiKeyData" } } }
+                  ]
+                },
+                "example": {
+                  "code": 0,
+                  "data": {
+                    "api_key": "sk-new-api-key-value",
+                    "api_key_masked": "sk-n••••••••••••••••"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

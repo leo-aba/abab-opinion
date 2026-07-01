@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>实时追踪 — AI Video Opinion Analytics</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<!-- Sidebar Overlay (mobile) -->
+<div class="sidebar-overlay" id="sidebar-overlay" onclick="closeSidebar()"></div>
+
+<!-- Sidebar -->
+<aside class="sidebar" id="sidebar">
+    <div class="sidebar-logo">
+        <img src="logo.png" alt="Opinion AI Logo" width="32" height="32">
+        Opinion AI
+    </div>
+
+    <nav class="sidebar-nav">
+        <div class="nav-section">主菜单</div>
+        <a href="dashboard.html" class="nav-item">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+            <span>Dashboard</span>
+        </a>
+        <a href="create-analysis.html" class="nav-item">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 8v8M8 12h8"/></svg>
+            <span>创建分析</span>
+        </a>
+        <a href="pipeline.html" class="nav-item">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+            <span>实时分析</span>
+        </a>
+        <a href="tracking.html" class="nav-item active" id="nav-tracking">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="4"/><line x1="12" y1="2" x2="12" y2="6"/></svg>
+            <span>实时追踪</span>
+        </a>
+        <a href="results.html" class="nav-item">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 20V10M12 20V4M6 20v-6"/></svg>
+            <span>分析结果</span>
+        </a>
+
+        <div class="nav-section">管理</div>
+        <a href="videos.html" class="nav-item">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>
+            <span>视频管理</span>
+        </a>
+        <a href="history.html" class="nav-item">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+            <span>历史记录</span>
+        </a>
+        <a href="settings.html" class="nav-item">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
+            <span>系统设置</span>
+        </a>
+    </nav>
+
+    <div class="sidebar-footer">
+        <div class="sidebar-user">
+            <div class="sidebar-avatar" id="sidebar-avatar-text">L</div>
+            <div class="sidebar-user-info">
+                <div class="sidebar-user-name" id="sidebar-display-name">刘心宇</div>
+                <div class="sidebar-user-role" id="sidebar-role">管理员</div>
+            </div>
+        </div>
+        <button class="logout-btn" onclick="doLogout()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9"/></svg>
+            退出登录
+        </button>
+    </div>
+</aside>
+
+<!-- Main Content -->
+<main class="main-content">
+    <!-- Header -->
+    <header class="top-header">
+        <div class="header-left">
+            <button class="mobile-menu-btn" onclick="toggleSidebar()" title="菜单">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+            </button>
+            <div>
+                <h2>实时追踪</h2>
+                <div class="greeting">管理正在运行的实时追踪任务</div>
+            </div>
+        </div>
+        <div class="header-stats">
+            <div class="header-stat">
+                <div class="val" id="stat-today-comments">—</div>
+                <div class="lbl">今日评论</div>
+            </div>
+            <div class="header-stat">
+                <div class="val" id="stat-new-videos">—</div>
+                <div class="lbl">新增视频</div>
+            </div>
+            <div class="header-stat">
+                <div class="val" id="stat-completion">—</div>
+                <div class="lbl">分析完成</div>
+            </div>
+            <div class="header-stat">
+                <div class="val" id="stat-hot-topic">—</div>
+                <div class="lbl">最近热点</div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Page Content -->
+    <div class="page-content active" id="content-tracking">
+        <div id="tracking-tasks-container">
+            <div style="text-align:center;padding:60px 20px;color:var(--text-secondary-dark);" id="tracking-empty" >
+                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="margin-bottom:16px;color:#9CA3AF;"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="4"/><line x1="12" y1="2" x2="12" y2="6"/></svg>
+                <p style="font-size:15px;font-weight:500;">暂无实时追踪任务</p>
+                <p style="font-size:13px;margin-top:4px;">在「创建分析」中选择「实时追踪」模式来启动一个追踪任务</p>
+                <a href="create-analysis.html" class="btn" style="background:var(--orange);color:var(--cream);margin-top:16px;padding:10px 24px;display:inline-block;">+ 创建分析</a>
+            </div>
+            <div id="tracking-tasks-list"></div>
+        </div>
+    </div>
+</main>
+
+<script src="js/api.js"></script>
+<script src="js/common.js"></script>
+<script>
+async function loadTrackingTasks() {
+    const empty = document.getElementById('tracking-empty');
+    const list = document.getElementById('tracking-tasks-list');
+
+    try {
+        const tasks = await api.getTrackingTasks();
+
+        if (!tasks || tasks.length === 0) {
+            empty.style.display = 'block';
+            list.innerHTML = '';
+            return;
+        }
+
+        empty.style.display = 'none';
+
+        let html = '';
+        for (const t of tasks) {
+            const logsHtml = (t.recent_logs && t.recent_logs.length > 0)
+                ? t.recent_logs.map(l => `<div>${l.time} ${l.message}</div>`).join('\n')
+                : '<div style="color:var(--text-secondary);">暂无日志</div>';
+
+            html += `
+            <div class="chart-card" style="margin-bottom:20px;">
+                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
+                    <div style="display:flex;align-items:center;gap:12px;">
+                        <div class="tracking-status-row"><span class="tracking-live-dot"></span>追踪中</div>
+                        <h3 style="font-size:16px;font-weight:600;">${escapeHtml(t.video_title)}</h3>
+                    </div>
+                    <div style="display:flex;gap:8px;">
+                        <a href="results.html?task_id=${encodeURIComponent(t.task_id)}" class="btn-sm" style="background:var(--orange);color:var(--cream);">查看结果</a>
+                        <button class="btn-danger-sm" onclick="stopTracking(${t.tracking_id})">停止追踪</button>
+                    </div>
+                </div>
+                <div class="video-card-meta" style="margin-bottom:16px;">
+                    <span>${getPlatformLabel(t.platform)} · ${escapeHtml(t.author)}</span>
+                    <span>分析完成时间: ${t.analysis_finished_at || '—'}</span>
+                </div>
+                <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:16px;">
+                    <div style="background:var(--bg);padding:16px;border-radius:8px;text-align:center;">
+                        <div style="font-size:24px;font-weight:800;color:var(--green);">+${(t.new_comments || 0).toLocaleString()}</div>
+                        <div style="font-size:11px;color:var(--text-secondary);margin-top:4px;">新增评论</div>
+                    </div>
+                    <div style="background:var(--bg);padding:16px;border-radius:8px;text-align:center;">
+                        <div style="font-size:24px;font-weight:800;">${(t.total_comments || 0).toLocaleString()}</div>
+                        <div style="font-size:11px;color:var(--text-secondary);margin-top:4px;">总评论数</div>
+                    </div>
+                    <div style="background:var(--bg);padding:16px;border-radius:8px;text-align:center;">
+                        <div style="font-size:24px;font-weight:800;color:var(--accent);">${(t.credits_remaining || 0).toLocaleString()}</div>
+                        <div style="font-size:11px;color:var(--text-secondary);margin-top:4px;">剩余积分</div>
+                    </div>
+                    <div style="background:var(--bg);padding:16px;border-radius:8px;text-align:center;">
+                        <div style="font-size:24px;font-weight:800;">${formatDuration(t.duration_seconds || 0)}</div>
+                        <div style="font-size:11px;color:var(--text-secondary);margin-top:4px;">运行时间</div>
+                    </div>
+                </div>
+                <div style="margin-top:16px;padding:14px 18px;background:var(--bg);border-radius:8px;">
+                    <h4 style="font-size:13px;font-weight:600;margin-bottom:8px;color:var(--cream);">最新追踪日志</h4>
+                    <div style="font-family:monospace;font-size:11px;color:var(--text-secondary);line-height:1.8;">
+                        ${logsHtml}
+                    </div>
+                </div>
+            </div>`;
+        }
+        list.innerHTML = html;
+    } catch (e) {
+        console.error('loadTrackingTasks error:', e);
+        showError('tracking-tasks-list', '加载追踪任务失败，请重试');
+        empty.style.display = 'block';
+    }
+}
+
+async function stopTracking(trackingId) {
+    try {
+        await api.stopTracking(trackingId);
+        await loadTrackingTasks();
+    } catch (e) {
+        console.error('stopTracking error:', e);
+        alert('停止追踪失败：' + (e.message || '未知错误'));
+    }
+}
+
+function getPlatformLabel(platform) {
+    if (platform === 'bilibili') return 'Bilibili';
+    if (platform === 'douyin') return '抖音';
+    return platform || '未知平台';
+}
+
+function escapeHtml(str) {
+    if (!str) return '';
+    const div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
+}
+
+// Init
+initPage().then(() => loadTrackingTasks());
+</script>
+</body>
+</html>

@@ -1,0 +1,653 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="AI Video Opinion Analytics — Analysis Results">
+    <title>分析结果 — AI Video Opinion Analytics</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <div class="page app-page active" id="page-app">
+
+        <!-- Sidebar Overlay (mobile) -->
+        <div class="sidebar-overlay" id="sidebar-overlay" onclick="toggleSidebar()"></div>
+
+        <!-- Sidebar -->
+        <aside class="sidebar" id="sidebar">
+            <div class="sidebar-logo">
+                <img src="logo.png" alt="Opinion AI Logo" style="width:32px;height:32px;">
+                Opinion AI
+            </div>
+
+            <nav class="sidebar-nav">
+                <div class="nav-section">主菜单</div>
+                <a href="dashboard.html" class="nav-item">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+                    <span>Dashboard</span>
+                </a>
+                <a href="create-analysis.html" class="nav-item">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 8v8M8 12h8"/></svg>
+                    <span>创建分析</span>
+                </a>
+                <a href="pipeline.html" class="nav-item">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+                    <span>实时分析</span>
+                </a>
+                <a href="results.html" class="nav-item active">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 20V10M12 20V4M6 20v-6"/></svg>
+                    <span>分析结果</span>
+                </a>
+
+                <div class="nav-section">管理</div>
+                <a href="videos.html" class="nav-item">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>
+                    <span>视频管理</span>
+                </a>
+                <a href="history.html" class="nav-item">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                    <span>历史记录</span>
+                </a>
+                <a href="settings.html" class="nav-item">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
+                    <span>系统设置</span>
+                </a>
+            </nav>
+
+            <div class="sidebar-footer">
+                <div class="sidebar-user">
+                    <div class="sidebar-avatar" id="sidebar-avatar-text">L</div>
+                    <div class="sidebar-user-info">
+                        <div class="sidebar-user-name" id="sidebar-display-name">—</div>
+                        <div class="sidebar-user-role" id="sidebar-role">—</div>
+                    </div>
+                </div>
+                <button class="logout-btn" onclick="doLogout()" title="退出登录">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9"/></svg>
+                </button>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Header -->
+            <header class="top-header">
+                <div class="header-left">
+                    <button class="mobile-menu-btn" onclick="toggleSidebar()" title="菜单">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+                    </button>
+                    <h2>分析结果</h2>
+                    <div class="greeting" id="results-video-title">—</div>
+                </div>
+                <div class="header-right" style="display:flex;gap:24px;align-items:center;">
+                    <div class="stat-item">
+                        <span class="stat-label">今日评论</span>
+                        <span class="stat-value" id="stat-today-comments">—</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">新增视频</span>
+                        <span class="stat-value" id="stat-new-videos">—</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">完成率</span>
+                        <span class="stat-value" id="stat-completion">—</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">热门话题</span>
+                        <span class="stat-value" id="stat-hot-topic">—</span>
+                    </div>
+                </div>
+            </header>
+
+            <!-- Page Content -->
+            <div class="page-content" id="content-results">
+
+                <!-- Loading State -->
+                <div id="results-loading" style="display:flex;align-items:center;justify-content:center;padding:80px 20px;color:var(--text-secondary-dark);">
+                    <div style="text-align:center;">
+                        <div style="font-size:32px;margin-bottom:12px;">&#9203;</div>
+                        <p>加载中...</p>
+                    </div>
+                </div>
+
+                <!-- Results Container (hidden until loaded) -->
+                <div id="results-container" style="display:none;">
+
+                <!-- Tracking Status Bar (hidden by default) -->
+                <div class="tracking-info-bar" id="results-tracking-bar" style="display:none;">
+                    <div class="tracking-info-left">
+                        <div class="tracking-status-row">
+                            <span class="tracking-live-dot"></span>
+                            实时追踪中
+                        </div>
+                        <div class="tracking-info-item">
+                            <span class="label">新增评论</span>
+                            <span class="val" id="tracking-new">—</span>
+                        </div>
+                        <div class="tracking-info-item">
+                            <span class="label">总评论</span>
+                            <span class="val" id="tracking-total">—</span>
+                        </div>
+                        <div class="tracking-info-item">
+                            <span class="label">剩余积分</span>
+                            <span class="val" id="tracking-credits">—</span>
+                        </div>
+                        <div class="tracking-info-item">
+                            <span class="label">运行时间</span>
+                            <span class="val" id="tracking-elapsed">—</span>
+                        </div>
+                    </div>
+                    <div class="flex gap-4">
+                        <button class="btn-sm" onclick="window.location.href='pipeline.html'">刷新数据</button>
+                        <button class="btn-danger-sm" id="btn-stop-tracking" onclick="stopTracking()">停止追踪</button>
+                    </div>
+                </div>
+
+                <!-- Tabs Navigation -->
+                <div class="tabs-nav">
+                    <button class="tab-btn active" onclick="switchResultTab(this, 'overview')">概览</button>
+                    <button class="tab-btn" onclick="switchResultTab(this, 'topics')">Topic 聚类</button>
+                    <button class="tab-btn" onclick="switchResultTab(this, 'sentiment')">属性情感</button>
+                    <button class="tab-btn" onclick="switchResultTab(this, 'trends')">时间趋势</button>
+                    <button class="tab-btn" onclick="switchResultTab(this, 'aisummary')">AI 总结</button>
+                    <button class="tab-btn" onclick="switchResultTab(this, 'search')">评论检索</button>
+                </div>
+
+                <!-- Tab: Overview -->
+                <div class="tab-panel active" id="tab-overview">
+                    <div class="results-summary">
+                        <div class="result-stat">
+                            <div class="num" id="ov-total-comments">—</div>
+                            <div class="lbl">评论总数</div>
+                        </div>
+                        <div class="result-stat">
+                            <div class="num" id="ov-topic-count">—</div>
+                            <div class="lbl">Topic 数量</div>
+                        </div>
+                        <div class="result-stat positive">
+                            <div class="num" id="ov-positive-pct">—</div>
+                            <div class="lbl">正面评价</div>
+                        </div>
+                        <div class="result-stat negative">
+                            <div class="num" id="ov-negative-pct">—</div>
+                            <div class="lbl">负面评价</div>
+                        </div>
+                        <div class="result-stat neutral">
+                            <div class="num" id="ov-neutral-pct">—</div>
+                            <div class="lbl">中性评价</div>
+                        </div>
+                    </div>
+
+                    <div class="chart-row">
+                        <div class="chart-card">
+                            <div class="chart-card-header">
+                                <h3>评论趋势</h3>
+                                <span class="chart-badge">近30天</span>
+                            </div>
+                            <div class="chart-wrap">
+                                <canvas id="resultsTrendChart"></canvas>
+                            </div>
+                        </div>
+                        <div class="chart-card">
+                            <div class="chart-card-header">
+                                <h3>情绪分布</h3>
+                                <span class="chart-badge">总体</span>
+                            </div>
+                            <div class="chart-wrap">
+                                <canvas id="resultsPieChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Tab: Topics -->
+                <div class="tab-panel" id="tab-topics">
+                    <div class="topic-split">
+                        <div class="topic-list-panel" id="topic-list">
+                            <!-- populated by loadTopicsTab() -->
+                        </div>
+                        <div class="topic-detail-panel" id="topic-detail-panel">
+                            <h3 id="topic-detail-name">—</h3>
+                            <div class="topic-detail-meta" id="topic-detail-meta">—</div>
+                            <div class="detail-section" id="topic-detail-comments-section">
+                                <h4>代表评论</h4>
+                                <div id="topic-detail-comments"></div>
+                            </div>
+                            <div class="detail-section" id="topic-detail-keywords-section">
+                                <h4>关键词</h4>
+                                <div class="keyword-tags" id="topic-detail-keywords"></div>
+                            </div>
+                            <div class="detail-section" id="topic-detail-ai-section">
+                                <h4>AI 总结</h4>
+                                <p id="topic-detail-ai-summary" style="font-size:13px;color:var(--text-secondary);line-height:1.7;">—</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Tab: Sentiment -->
+                <div class="tab-panel" id="tab-sentiment">
+                    <div id="sentiment-loading" style="display:flex;align-items:center;justify-content:center;padding:60px;color:var(--text-secondary-dark);">加载中...</div>
+                    <div id="sentiment-content" style="display:none;">
+                        <div class="chart-row-equal">
+                            <div class="chart-card">
+                                <div class="chart-card-header">
+                                    <h3>属性情感分布</h3>
+                                    <span class="chart-badge">多维度</span>
+                                </div>
+                                <div class="chart-wrap">
+                                    <canvas id="sunburstChart"></canvas>
+                                </div>
+                            </div>
+                            <div class="chart-card">
+                                <div class="chart-card-header">
+                                    <h3>正负面情感对比</h3>
+                                    <span class="chart-badge">雷达图</span>
+                                </div>
+                                <div class="chart-wrap">
+                                    <canvas id="radarChart"></canvas>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Tab: Trends -->
+                <div class="tab-panel" id="tab-trends">
+                    <div class="chart-card">
+                        <div class="chart-card-header">
+                            <h3>时间趋势详情</h3>
+                            <div class="search-tabs">
+                                <button class="search-tab active" onclick="switchTrendGranularity(this, 'day')">按天</button>
+                                <button class="search-tab" onclick="switchTrendGranularity(this, 'hour')">按小时</button>
+                                <button class="search-tab" onclick="switchTrendGranularity(this, 'week')">按周</button>
+                            </div>
+                        </div>
+                        <div class="chart-wrap" style="height:360px;">
+                            <canvas id="trendsDetailChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Tab: AI Summary -->
+                <div class="tab-panel" id="tab-aisummary">
+                    <div id="aisummary-loading" style="display:flex;align-items:center;justify-content:center;padding:60px;color:var(--text-secondary-dark);">加载中...</div>
+                    <div class="ai-summary-card" id="aisummary-content" style="display:none;">
+                        <div class="ai-badge">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 015.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+                            AI 自动总结
+                        </div>
+                        <h3 id="ai-summary-title">—</h3>
+                        <p class="summary-text" id="ai-summary-text">—</p>
+                        <div class="summary-highlights" id="ai-summary-highlights"></div>
+                    </div>
+                </div>
+
+                <!-- Tab: Comment Search -->
+                <div class="tab-panel" id="tab-search">
+                    <div class="comment-search-box">
+                        <input type="text" id="commentSearchInput" placeholder="搜索评论关键词..." onkeydown="if(event.key==='Enter')searchCommentsDebounced()">
+                        <button class="btn btn-primary" style="width:auto;" onclick="searchCommentsDebounced()">搜索</button>
+                    </div>
+                    <p id="searchResultCount" style="font-size:13px;color:var(--text-secondary);margin-bottom:16px;">—</p>
+                    <div class="comment-list" id="comment-list">
+                        <!-- populated by searchComments() -->
+                    </div>
+                    <!-- Pagination -->
+                    <div id="comment-pagination" style="display:none;justify-content:center;align-items:center;gap:8px;margin-top:16px;"></div>
+                </div>
+
+                </div><!-- end results-container -->
+
+            </div>
+        </main>
+    </div>
+
+    <!-- Scripts -->
+    <script src="js/api.js"></script>
+    <script src="js/common.js"></script>
+    <script src="js/charts.js"></script>
+    <script>
+        // ============================================================
+        // State
+        // ============================================================
+        var currentTaskId = null;
+        var currentTopicsData = [];
+        var currentTrendGranularity = 'day';
+        var tabsLoaded = {};
+        var commentSearchTimer = null;
+
+        // ============================================================
+        // Init — read task_id from URL, load overview
+        // ============================================================
+        window.addEventListener('DOMContentLoaded', function() {
+            var params = new URLSearchParams(window.location.search);
+            currentTaskId = params.get('task_id');
+            if (!currentTaskId) {
+                showError('results-loading', '缺少 task_id 参数，请从分析任务列表进入。');
+                return;
+            }
+            initPage({ loadUser: true, loadHeaderStats: true }).then(function() {
+                loadOverview();
+            });
+        });
+
+        // ============================================================
+        // Overview Tab
+        // ============================================================
+        async function loadOverview() {
+            if (!currentTaskId) return;
+            try {
+                var overview = await api.getResultsOverview(currentTaskId);
+                // Populate stat cards
+                setText('results-video-title', overview.video_title || '—');
+                setText('ov-total-comments', (overview.total_comments || 0).toLocaleString());
+                setText('ov-topic-count', (overview.topic_count || 0).toString());
+                setText('ov-positive-pct', (overview.positive_pct || 0) + '%');
+                setText('ov-negative-pct', (overview.negative_pct || 0) + '%');
+                setText('ov-neutral-pct', (overview.neutral_pct || 0) + '%');
+
+                // Load trend and pie charts
+                var trendData = await api.getResultsTrend(currentTaskId, 'day');
+                renderResultsTrend(trendData);
+
+                var sentimentData = await api.getResultsSentimentRatio(currentTaskId);
+                renderResultsPie(sentimentData);
+
+                // Load tracking status
+                loadTrackingStatus();
+
+                // Hide loading, show container
+                document.getElementById('results-loading').style.display = 'none';
+                document.getElementById('results-container').style.display = '';
+            } catch (e) {
+                console.error('loadOverview error:', e);
+                showError('results-loading', '加载概览数据失败: ' + (e.message || '未知错误'));
+            }
+        }
+
+        // ============================================================
+        // Tracking Status
+        // ============================================================
+        async function loadTrackingStatus() {
+            if (!currentTaskId) return;
+            try {
+                var status = await api.getResultsTrackingStatus(currentTaskId);
+                if (status && status.is_tracking) {
+                    var bar = document.getElementById('results-tracking-bar');
+                    if (bar) bar.style.display = '';
+                    setText('tracking-new', '+' + (status.new_comments || 0).toLocaleString());
+                    setText('tracking-total', (status.total_comments || 0).toLocaleString());
+                    setText('tracking-credits', (status.credits_remaining || 0).toLocaleString());
+                    setText('tracking-elapsed', status.duration_formatted || formatDuration(status.duration_seconds || 0));
+                } else {
+                    var bar = document.getElementById('results-tracking-bar');
+                    if (bar) bar.style.display = 'none';
+                }
+            } catch (e) {
+                console.error('loadTrackingStatus error:', e);
+            }
+        }
+
+        function stopTracking() {
+            if (!currentTaskId) return;
+            api.stopTracking(currentTaskId).then(function() {
+                var bar = document.getElementById('results-tracking-bar');
+                if (bar) bar.style.display = 'none';
+            }).catch(function(e) {
+                console.error('stopTracking error:', e);
+            });
+        }
+
+        // ============================================================
+        // Tab Switching with Lazy Loading
+        // ============================================================
+        function switchResultTab(btn, tabName) {
+            document.querySelectorAll('#content-results .tab-btn').forEach(function(t) { t.classList.remove('active'); });
+            btn.classList.add('active');
+            document.querySelectorAll('#content-results .tab-panel').forEach(function(p) { p.classList.remove('active'); });
+            var panel = document.getElementById('tab-' + tabName);
+            if (panel) panel.classList.add('active');
+
+            // Lazy load tab content
+            switch (tabName) {
+                case 'overview':    if (!tabsLoaded['overview']) { tabsLoaded['overview'] = true; } break;
+                case 'topics':      if (!tabsLoaded['topics']) { tabsLoaded['topics'] = true; loadTopicsTab(); } break;
+                case 'sentiment':   if (!tabsLoaded['sentiment']) { tabsLoaded['sentiment'] = true; loadSentimentTab(); } break;
+                case 'trends':      if (!tabsLoaded['trends']) { tabsLoaded['trends'] = true; loadTrendsTab(); } break;
+                case 'aisummary':   if (!tabsLoaded['aisummary']) { tabsLoaded['aisummary'] = true; loadAISummaryTab(); } break;
+                case 'search':      if (!tabsLoaded['search']) { tabsLoaded['search'] = true; loadSearchTab(); } break;
+            }
+        }
+
+        // ============================================================
+        // Topics Tab
+        // ============================================================
+        async function loadTopicsTab() {
+            if (!currentTaskId) return;
+            var container = document.getElementById('topic-list');
+            showLoading('topic-list');
+            try {
+                var topics = await api.getResultsTopics(currentTaskId);
+                currentTopicsData = topics || [];
+                if (!currentTopicsData.length) {
+                    showEmpty('topic-list', '暂无 Topic 数据', '📭');
+                    return;
+                }
+                var html = '';
+                currentTopicsData.forEach(function(t, idx) {
+                    html += '<div class="topic-list-item' + (idx === 0 ? ' active' : '') + '" onclick="showTopicDetail(this, \'' + escapeHtml(t.topic_name) + '\')">' +
+                        '<span class="topic-name">' + escapeHtml(t.topic_name) + '</span>' +
+                        '<span class="topic-count">' + (t.comment_count || 0).toLocaleString() + '</span>' +
+                        '</div>';
+                });
+                container.innerHTML = html;
+                // Auto-select first topic
+                if (currentTopicsData.length > 0) {
+                    showTopicDetail(container.querySelector('.topic-list-item'), currentTopicsData[0].topic_name);
+                }
+            } catch (e) {
+                console.error('loadTopicsTab error:', e);
+                showError('topic-list', '加载话题列表失败');
+            }
+        }
+
+        async function showTopicDetail(el, topicName) {
+            if (!currentTaskId) return;
+            // Highlight active
+            var items = document.querySelectorAll('#topic-list .topic-list-item');
+            items.forEach(function(t) { t.classList.remove('active'); });
+            if (el) el.classList.add('active');
+
+            // Show loading in detail panel
+            var panel = document.getElementById('topic-detail-panel');
+            setText('topic-detail-name', topicName);
+            setText('topic-detail-meta', '加载中...');
+            document.getElementById('topic-detail-comments').innerHTML = '';
+            document.getElementById('topic-detail-keywords').innerHTML = '';
+            setText('topic-detail-ai-summary', '—');
+
+            try {
+                var detail = await api.getResultsTopicDetail(currentTaskId, topicName);
+                setText('topic-detail-name', detail.topic_name || topicName);
+                setText('topic-detail-meta', (detail.comment_count || 0).toLocaleString() + ' 条相关评论 | 占比 ' + (detail.percentage || '0') + '%');
+
+                // Sample comments
+                var commentsHtml = '';
+                if (detail.sample_comments && detail.sample_comments.length) {
+                    detail.sample_comments.forEach(function(c) {
+                        commentsHtml += '<div class="comment-example">"' + escapeHtml(c) + '"</div>';
+                    });
+                } else {
+                    commentsHtml = '<div class="comment-example">暂无代表评论</div>';
+                }
+                document.getElementById('topic-detail-comments').innerHTML = commentsHtml;
+
+                // Keywords
+                var kwHtml = '';
+                if (detail.keywords && detail.keywords.length) {
+                    detail.keywords.forEach(function(k) {
+                        kwHtml += '<span class="keyword-tag">' + escapeHtml(k) + '</span>';
+                    });
+                } else {
+                    kwHtml = '<span class="keyword-tag">暂无关键词</span>';
+                }
+                document.getElementById('topic-detail-keywords').innerHTML = kwHtml;
+
+                // AI summary
+                setText('topic-detail-ai-summary', detail.ai_summary || '暂无AI总结');
+            } catch (e) {
+                console.error('showTopicDetail error:', e);
+                setText('topic-detail-meta', '加载失败');
+                setText('topic-detail-ai-summary', '加载失败: ' + (e.message || '未知错误'));
+            }
+        }
+
+        // ============================================================
+        // Sentiment Tab
+        // ============================================================
+        async function loadSentimentTab() {
+            if (!currentTaskId) return;
+            try {
+                var data = await api.getResultsSentimentAttribute(currentTaskId);
+                document.getElementById('sentiment-loading').style.display = 'none';
+                document.getElementById('sentiment-content').style.display = '';
+                if (data.sunburst && data.sunburst.length) {
+                    renderSunburst(data.sunburst);
+                }
+                if (data.radar) {
+                    renderRadar(data.radar);
+                }
+            } catch (e) {
+                console.error('loadSentimentTab error:', e);
+                setText('sentiment-loading', '加载失败: ' + (e.message || '未知错误'));
+            }
+        }
+
+        // ============================================================
+        // Trends Tab
+        // ============================================================
+        async function loadTrendsTab() {
+            if (!currentTaskId) return;
+            await loadTrendsDetail(currentTrendGranularity);
+        }
+
+        async function loadTrendsDetail(granularity) {
+            if (!currentTaskId) return;
+            try {
+                var data = await api.getResultsTrendsDetail(currentTaskId, granularity);
+                renderTrendsDetail(data);
+            } catch (e) {
+                console.error('loadTrendsDetail error:', e);
+            }
+        }
+
+        function switchTrendGranularity(btn, granularity) {
+            document.querySelectorAll('#tab-trends .search-tab').forEach(function(t) { t.classList.remove('active'); });
+            btn.classList.add('active');
+            currentTrendGranularity = granularity;
+            loadTrendsDetail(granularity);
+        }
+
+        // ============================================================
+        // AI Summary Tab
+        // ============================================================
+        async function loadAISummaryTab() {
+            if (!currentTaskId) return;
+            try {
+                var data = await api.getResultsAISummary(currentTaskId);
+                document.getElementById('aisummary-loading').style.display = 'none';
+                document.getElementById('aisummary-content').style.display = '';
+                setText('ai-summary-title', data.title || '—');
+                setText('ai-summary-text', data.summary_text || '—');
+
+                var highlightsHtml = '';
+                if (data.highlights && data.highlights.length) {
+                    data.highlights.forEach(function(h) {
+                        highlightsHtml += '<div class="highlight-item">' +
+                            '<div class="hl-label">' + escapeHtml(h.label) + '</div>' +
+                            '<div class="hl-text">' + escapeHtml(h.text) + '</div>' +
+                            '</div>';
+                    });
+                }
+                setHTML('ai-summary-highlights', highlightsHtml);
+            } catch (e) {
+                console.error('loadAISummaryTab error:', e);
+                setText('aisummary-loading', '加载失败: ' + (e.message || '未知错误'));
+            }
+        }
+
+        // ============================================================
+        // Comment Search Tab
+        // ============================================================
+        function loadSearchTab() {
+            if (!currentTaskId) return;
+            searchComments();
+        }
+
+        function searchCommentsDebounced() {
+            if (commentSearchTimer) clearTimeout(commentSearchTimer);
+            commentSearchTimer = setTimeout(function() { searchComments(); }, 300);
+        }
+
+        async function searchComments(page) {
+            if (!currentTaskId) return;
+            var keyword = document.getElementById('commentSearchInput').value.trim();
+            page = page || 1;
+            var pageSize = 20;
+
+            showLoading('comment-list');
+            try {
+                var result = await api.searchComments(currentTaskId, keyword, page, pageSize);
+                setText('searchResultCount', '共 ' + (result.total || 0) + ' 条评论' + (keyword ? '（关键词: ' + keyword + '）' : '') + '，第 ' + page + ' 页');
+
+                var html = '';
+                if (result.items && result.items.length) {
+                    result.items.forEach(function(item) {
+                        var textHtml = item.highlighted_text || escapeHtml(item.text || '');
+                        html += '<div class="comment-item">' +
+                            '<div class="comment-text">' + textHtml + '</div>' +
+                            '<div class="comment-meta">' +
+                            '<span>' + escapeHtml(item.platform || '') + '用户 · ' + escapeHtml(item.time_ago || '') + '</span>' +
+                            (item.topic ? '<span class="comment-topic-badge">' + escapeHtml(item.topic) + '</span>' : '') +
+                            (item.likes ? '<span>❤ ' + item.likes + '</span>' : '') +
+                            '</div>' +
+                            '</div>';
+                    });
+                } else {
+                    html = '<div style="padding:40px;text-align:center;color:var(--text-secondary-dark);">暂无评论数据</div>';
+                }
+                setHTML('comment-list', html);
+
+                // Pagination
+                var totalPages = Math.ceil((result.total || 0) / pageSize);
+                var pagHtml = '';
+                if (totalPages > 1) {
+                    pagHtml += '<button class="btn-sm" onclick="searchComments(' + (page - 1) + ')"' + (page <= 1 ? ' disabled' : '') + '>上一页</button>';
+                    pagHtml += '<span style="color:var(--text-secondary);font-size:13px;">' + page + ' / ' + totalPages + '</span>';
+                    pagHtml += '<button class="btn-sm" onclick="searchComments(' + (page + 1) + ')"' + (page >= totalPages ? ' disabled' : '') + '>下一页</button>';
+                }
+                document.getElementById('comment-pagination').style.display = totalPages > 1 ? '' : 'none';
+                setHTML('comment-pagination', pagHtml);
+            } catch (e) {
+                console.error('searchComments error:', e);
+                showError('comment-list', '搜索评论失败: ' + (e.message || '未知错误'));
+            }
+        }
+
+        // ============================================================
+        // Helpers
+        // ============================================================
+        function escapeHtml(text) {
+            if (!text) return '';
+            var div = document.createElement('div');
+            div.appendChild(document.createTextNode(text));
+            return div.innerHTML;
+        }
+    </script>
+</body>
+</html>

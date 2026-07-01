@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>视频管理 — AI Video Opinion Analytics</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<!-- Sidebar Overlay (mobile) -->
+<div class="sidebar-overlay" id="sidebar-overlay" onclick="closeSidebar()"></div>
+
+<!-- Sidebar -->
+<aside class="sidebar" id="sidebar">
+    <div class="sidebar-logo">
+        <img src="logo.png" alt="Opinion AI Logo" width="32" height="32">
+        Opinion AI
+    </div>
+
+    <nav class="sidebar-nav">
+        <div class="nav-section">主菜单</div>
+        <a href="dashboard.html" class="nav-item">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+            <span>Dashboard</span>
+        </a>
+        <a href="create-analysis.html" class="nav-item">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 8v8M8 12h8"/></svg>
+            <span>创建分析</span>
+        </a>
+        <a href="pipeline.html" class="nav-item">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+            <span>实时分析</span>
+        </a>
+        <a href="tracking.html" class="nav-item">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="4"/><line x1="12" y1="2" x2="12" y2="6"/></svg>
+            <span>实时追踪</span>
+        </a>
+        <a href="results.html" class="nav-item">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 20V10M12 20V4M6 20v-6"/></svg>
+            <span>分析结果</span>
+        </a>
+
+        <div class="nav-section">管理</div>
+        <a href="videos.html" class="nav-item active">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>
+            <span>视频管理</span>
+        </a>
+        <a href="history.html" class="nav-item">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+            <span>历史记录</span>
+        </a>
+        <a href="settings.html" class="nav-item">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
+            <span>系统设置</span>
+        </a>
+    </nav>
+
+    <div class="sidebar-footer">
+        <div class="sidebar-user">
+            <div class="sidebar-avatar" id="sidebar-avatar-text">L</div>
+            <div class="sidebar-user-info">
+                <div class="sidebar-user-name" id="sidebar-display-name">刘心宇</div>
+                <div class="sidebar-user-role" id="sidebar-role">管理员</div>
+            </div>
+        </div>
+        <button class="logout-btn" onclick="doLogout()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9"/></svg>
+            退出登录
+        </button>
+    </div>
+</aside>
+
+<!-- Main Content -->
+<main class="main-content">
+    <!-- Header -->
+    <header class="top-header">
+        <div class="header-left">
+            <button class="mobile-menu-btn" onclick="toggleSidebar()" title="菜单">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+            </button>
+            <div>
+                <h2>视频管理</h2>
+                <div class="greeting">管理已添加的分析视频</div>
+            </div>
+        </div>
+        <div class="header-stats">
+            <div class="header-stat">
+                <div class="val" id="stat-today-comments">—</div>
+                <div class="lbl">今日评论</div>
+            </div>
+            <div class="header-stat">
+                <div class="val" id="stat-new-videos">—</div>
+                <div class="lbl">新增视频</div>
+            </div>
+            <div class="header-stat">
+                <div class="val" id="stat-completion">—</div>
+                <div class="lbl">分析完成</div>
+            </div>
+            <div class="header-stat">
+                <div class="val" id="stat-hot-topic">—</div>
+                <div class="lbl">最近热点</div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Page Content -->
+    <div class="page-content active" id="content-videos">
+        <div class="video-grid" id="video-grid"></div>
+    </div>
+</main>
+
+<script src="js/api.js"></script>
+<script src="js/common.js"></script>
+<script>
+async function loadVideos() {
+    const grid = document.getElementById('video-grid');
+
+    try {
+        showLoading('video-grid');
+        const data = await api.getVideos(1, 20);
+
+        if (!data || !data.items || data.items.length === 0) {
+            showEmpty('video-grid', '暂无视频', '🎬');
+            return;
+        }
+
+        let html = '';
+        for (const v of data.items) {
+            const platformBadge = getPlatformBadge(v.platform);
+            const statusLabel = getStatusLabel(v.status);
+            const statusClass = getStatusClass(v.status);
+            const coverTitle = v.title || v.video_id;
+            const subtitle = v.last_analysis_date
+                ? '最后分析: ' + v.last_analysis_date
+                : '';
+
+            html += `
+            <div class="video-card" onclick="window.location.href='results.html?task_id=${encodeURIComponent(v.video_id)}'">
+                <div class="video-card-cover" style="background:var(--cover-bg, #111);overflow:hidden;">
+                    ${v.cover_url ? '<img src="' + escapeHtml(v.cover_url) + '" alt="" style="width:100%;height:100%;object-fit:cover;">' : '<span style="color:var(--text-secondary);font-size:13px;">' + escapeHtml(coverTitle) + '</span>'}
+                    ${platformBadge}
+                    ${v.status === 'tracking' ? '<span class="tracking-status-row" style="position:absolute;top:10px;right:10px;"><span class="tracking-live-dot"></span>追踪中</span>' : ''}
+                </div>
+                <div class="video-card-body">
+                    <h4>${escapeHtml(v.title)}</h4>
+                    <div class="video-card-meta">
+                        <span>${escapeHtml(v.author)}</span>
+                        <span>${(v.comment_count || 0).toLocaleString()} 评论</span>
+                    </div>
+                    ${subtitle || v.new_comments_since_tracking ? '<div class="video-card-meta" style="margin-top:4px;"><span>' + escapeHtml(v.publish_date || '') + '</span><span>' + (v.new_comments_since_tracking ? '追踪中 · 新增+' + v.new_comments_since_tracking : escapeHtml(subtitle)) + '</span></div>' : ''}
+                    <span class="video-card-status ${statusClass}">${statusLabel.text}</span>
+                </div>
+            </div>`;
+        }
+        grid.innerHTML = html;
+    } catch (e) {
+        console.error('loadVideos error:', e);
+        showError('video-grid', '加载视频列表失败，请重试');
+    }
+}
+
+function getPlatformBadge(platform) {
+    if (platform === 'bilibili') return '<span class="platform-badge bilibili">B站</span>';
+    if (platform === 'douyin') return '<span class="platform-badge douyin">抖音</span>';
+    return '';
+}
+
+function getStatusLabel(status) {
+    switch (status) {
+        case 'tracking': return { text: '实时追踪中', cls: 'tracking' };
+        case 'analyzed': return { text: '已分析', cls: 'analyzed' };
+        case 'analyzing': return { text: '分析中', cls: 'pending' };
+        case 'pending': return { text: '待分析', cls: 'pending' };
+        default: return { text: status || '—', cls: '' };
+    }
+}
+
+function getStatusClass(status) {
+    switch (status) {
+        case 'tracking': return 'tracking';
+        case 'analyzed': return 'analyzed';
+        case 'analyzing': return 'pending';
+        case 'pending': return 'pending';
+        default: return '';
+    }
+}
+
+function escapeHtml(str) {
+    if (!str) return '';
+    const div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
+}
+
+// Init
+initPage().then(() => loadVideos());
+</script>
+</body>
+</html>
