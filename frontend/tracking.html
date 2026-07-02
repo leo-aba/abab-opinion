@@ -124,6 +124,7 @@
 <script src="js/api.js"></script>
 <script src="js/common.js"></script>
 <script>
+/** 加载并渲染追踪任务列表 */
 async function loadTrackingTasks() {
     const empty = document.getElementById('tracking-empty');
     const list = document.getElementById('tracking-tasks-list');
@@ -195,6 +196,7 @@ async function loadTrackingTasks() {
     }
 }
 
+/** 停止指定追踪任务并刷新列表 */
 async function stopTracking(trackingId) {
     try {
         await api.stopTracking(trackingId);
@@ -205,12 +207,14 @@ async function stopTracking(trackingId) {
     }
 }
 
+/** 平台枚举 → 中文标签 */
 function getPlatformLabel(platform) {
     if (platform === 'bilibili') return 'Bilibili';
     if (platform === 'douyin') return '抖音';
     return platform || '未知平台';
 }
 
+/** 防 XSS 的 HTML 转义 */
 function escapeHtml(str) {
     if (!str) return '';
     const div = document.createElement('div');
@@ -218,7 +222,7 @@ function escapeHtml(str) {
     return div.innerHTML;
 }
 
-// Init
+// 初始化：加载用户信息后获取追踪任务
 initPage().then(() => loadTrackingTasks());
 </script>
 </body>

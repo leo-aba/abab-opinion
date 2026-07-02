@@ -319,14 +319,14 @@
         // ============================================================
         // State
         // ============================================================
-        var currentTaskId = null;
-        var currentTopicsData = [];
-        var currentTrendGranularity = 'day';
-        var tabsLoaded = {};
-        var commentSearchTimer = null;
+        var currentTaskId = null;           // 当前分析任务 ID
+        var currentTopicsData = [];         // Topic 列表缓存
+        var currentTrendGranularity = 'day'; // 趋势图粒度
+        var tabsLoaded = {};               // 标签页懒加载标记
+        var commentSearchTimer = null;      // 评论搜索防抖定时器
 
         // ============================================================
-        // Init — read task_id from URL, load overview
+        // 初始化 — 从 URL 取 task_id，加载概览
         // ============================================================
         window.addEventListener('DOMContentLoaded', function() {
             var params = new URLSearchParams(window.location.search);
@@ -341,13 +341,14 @@
         });
 
         // ============================================================
-        // Overview Tab
+        // 概览标签页
         // ============================================================
+        /** 加载概览数据：统计卡片 + 趋势图 + 情绪饼图 + 追踪状态 */
         async function loadOverview() {
             if (!currentTaskId) return;
             try {
                 var overview = await api.getResultsOverview(currentTaskId);
-                // Populate stat cards
+                // 填充统计卡片
                 setText('results-video-title', overview.video_title || '—');
                 setText('ov-total-comments', (overview.total_comments || 0).toLocaleString());
                 setText('ov-topic-count', (overview.topic_count || 0).toString());
@@ -355,17 +356,17 @@
                 setText('ov-negative-pct', (overview.negative_pct || 0) + '%');
                 setText('ov-neutral-pct', (overview.neutral_pct || 0) + '%');
 
-                // Load trend and pie charts
+                // 加载趋势图和情绪饼图
                 var trendData = await api.getResultsTrend(currentTaskId, 'day');
                 renderResultsTrend(trendData);
 
                 var sentimentData = await api.getResultsSentimentRatio(currentTaskId);
                 renderResultsPie(sentimentData);
 
-                // Load tracking status
+                // 加载追踪状态条
                 loadTrackingStatus();
 
-                // Hide loading, show container
+                // 隐藏 loading，显示内容
                 document.getElementById('results-loading').style.display = 'none';
                 document.getElementById('results-container').style.display = '';
             } catch (e) {
@@ -375,8 +376,9 @@
         }
 
         // ============================================================
-        // Tracking Status
+        // 追踪状态条
         // ============================================================
+        /** 加载追踪状态条（结果页顶部） */
         async function loadTrackingStatus() {
             if (!currentTaskId) return;
             try {
@@ -397,6 +399,7 @@
             }
         }
 
+        /** 停止追踪并隐藏状态条 */
         function stopTracking() {
             if (!currentTaskId) return;
             api.stopTracking(currentTaskId).then(function() {
@@ -408,8 +411,9 @@
         }
 
         // ============================================================
-        // Tab Switching with Lazy Loading
+        // 标签页切换（懒加载）
         // ============================================================
+        /** 切换到指定标签页，首次进入时触发懒加载 */
         function switchResultTab(btn, tabName) {
             document.querySelectorAll('#content-results .tab-btn').forEach(function(t) { t.classList.remove('active'); });
             btn.classList.add('active');
@@ -417,7 +421,7 @@
             var panel = document.getElementById('tab-' + tabName);
             if (panel) panel.classList.add('active');
 
-            // Lazy load tab content
+            // 标签页懒加载：首次访问时拉取数据并缓存
             switch (tabName) {
                 case 'overview':    if (!tabsLoaded['overview']) { tabsLoaded['overview'] = true; } break;
                 case 'topics':      if (!tabsLoaded['topics']) { tabsLoaded['topics'] = true; loadTopicsTab(); } break;
@@ -429,8 +433,9 @@
         }
 
         // ============================================================
-        // Topics Tab
+        // Topic 聚类标签页
         // ============================================================
+        /** 加载 Topic 列表并自动选中第一个 */
         async function loadTopicsTab() {
             if (!currentTaskId) return;
             var container = document.getElementById('topic-list');
@@ -450,7 +455,7 @@
                         '</div>';
                 });
                 container.innerHTML = html;
-                // Auto-select first topic
+                // 自动选中第一个 Topic
                 if (currentTopicsData.length > 0) {
                     showTopicDetail(container.querySelector('.topic-list-item'), currentTopicsData[0].topic_name);
                 }
@@ -460,14 +465,15 @@
             }
         }
 
+        /** 加载并展示单个 Topic 详情（代表评论 + 关键词 + AI 总结） */
         async function showTopicDetail(el, topicName) {
             if (!currentTaskId) return;
-            // Highlight active
+            // 高亮当前选中项
             var items = document.querySelectorAll('#topic-list .topic-list-item');
             items.forEach(function(t) { t.classList.remove('active'); });
             if (el) el.classList.add('active');
 
-            // Show loading in detail panel
+            // 详情面板显示 loading
             var panel = document.getElementById('topic-detail-panel');
             setText('topic-detail-name', topicName);
             setText('topic-detail-meta', '加载中...');
@@ -480,7 +486,7 @@
                 setText('topic-detail-name', detail.topic_name || topicName);
                 setText('topic-detail-meta', (detail.comment_count || 0).toLocaleString() + ' 条相关评论 | 占比 ' + (detail.percentage || '0') + '%');
 
-                // Sample comments
+                // 代表评论
                 var commentsHtml = '';
                 if (detail.sample_comments && detail.sample_comments.length) {
                     detail.sample_comments.forEach(function(c) {
@@ -491,7 +497,7 @@
                 }
                 document.getElementById('topic-detail-comments').innerHTML = commentsHtml;
 
-                // Keywords
+                // 关键词
                 var kwHtml = '';
                 if (detail.keywords && detail.keywords.length) {
                     detail.keywords.forEach(function(k) {
@@ -502,7 +508,7 @@
                 }
                 document.getElementById('topic-detail-keywords').innerHTML = kwHtml;
 
-                // AI summary
+                // AI 总结
                 setText('topic-detail-ai-summary', detail.ai_summary || '暂无AI总结');
             } catch (e) {
                 console.error('showTopicDetail error:', e);
@@ -512,8 +518,9 @@
         }
 
         // ============================================================
-        // Sentiment Tab
+        // 属性情感标签页
         // ============================================================
+        /** 加载属性情感数据并渲染旭日图 + 雷达图 */
         async function loadSentimentTab() {
             if (!currentTaskId) return;
             try {
@@ -533,13 +540,15 @@
         }
 
         // ============================================================
-        // Trends Tab
+        // 时间趋势标签页
         // ============================================================
+        /** 加载时间趋势数据 */
         async function loadTrendsTab() {
             if (!currentTaskId) return;
             await loadTrendsDetail(currentTrendGranularity);
         }
 
+        /** 按指定粒度加载并渲染趋势详情 */
         async function loadTrendsDetail(granularity) {
             if (!currentTaskId) return;
             try {
@@ -550,6 +559,7 @@
             }
         }
 
+        /** 切换趋势粒度（日/小时/周）并重新加载 */
         function switchTrendGranularity(btn, granularity) {
             document.querySelectorAll('#tab-trends .search-tab').forEach(function(t) { t.classList.remove('active'); });
             btn.classList.add('active');
@@ -558,8 +568,9 @@
         }
 
         // ============================================================
-        // AI Summary Tab
+        // AI 总结标签页
         // ============================================================
+        /** 加载 AI 总结报告 */
         async function loadAISummaryTab() {
             if (!currentTaskId) return;
             try {
@@ -586,18 +597,21 @@
         }
 
         // ============================================================
-        // Comment Search Tab
+        // 评论检索标签页
         // ============================================================
+        /** 初始化评论检索 */
         function loadSearchTab() {
             if (!currentTaskId) return;
             searchComments();
         }
 
+        /** 评论搜索防抖（300ms） */
         function searchCommentsDebounced() {
             if (commentSearchTimer) clearTimeout(commentSearchTimer);
             commentSearchTimer = setTimeout(function() { searchComments(); }, 300);
         }
 
+        /** 按关键词搜索评论（支持分页） */
         async function searchComments(page) {
             if (!currentTaskId) return;
             var keyword = document.getElementById('commentSearchInput').value.trim();
@@ -627,7 +641,7 @@
                 }
                 setHTML('comment-list', html);
 
-                // Pagination
+                // 分页控件
                 var totalPages = Math.ceil((result.total || 0) / pageSize);
                 var pagHtml = '';
                 if (totalPages > 1) {
@@ -644,8 +658,9 @@
         }
 
         // ============================================================
-        // Helpers
+        // 工具函数
         // ============================================================
+        /** 防 XSS 的 HTML 转义 */
         function escapeHtml(text) {
             if (!text) return '';
             var div = document.createElement('div');

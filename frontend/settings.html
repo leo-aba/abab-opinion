@@ -181,31 +181,30 @@
     <script>
 let currentSettings = null;
 
+/** 加载所有设置项并填充到表单 */
 async function loadSettings() {
     try {
         currentSettings = await api.getSettings();
 
-        // Analysis preferences
+        // 分析偏好
         if (currentSettings.analysis_preferences) {
             const ap = currentSettings.analysis_preferences;
-            // Default comment count
             const countSelect = document.getElementById('setting-default-comment-count');
             if (ap.default_comment_count) {
                 countSelect.value = ap.default_comment_count;
             }
-            // Toggles
             setToggleState('toggle-auto-ai-summary', ap.auto_ai_summary);
             setToggleState('toggle-realtime-animation', ap.realtime_animation);
         }
 
-        // Notification preferences
+        // 通知偏好
         if (currentSettings.notification_preferences) {
             const np = currentSettings.notification_preferences;
             setToggleState('toggle-analysis-complete-notify', np.analysis_complete_notify);
             setToggleState('toggle-anomaly-alert', np.anomaly_alert);
         }
 
-        // Account info
+        // 账户信息
         if (currentSettings.account) {
             const acct = currentSettings.account;
             setText('setting-username-value', acct.username || '—');
@@ -218,6 +217,7 @@ async function loadSettings() {
     }
 }
 
+/** 设置开关组件的 on/off 状态 */
 function setToggleState(id, value) {
     const el = document.getElementById(id);
     if (!el) return;
@@ -228,8 +228,9 @@ function setToggleState(id, value) {
     }
 }
 
-// ---- Analysis preference handlers ----
+// ---- 分析偏好变更处理 ----
 
+/** 默认评论数量下拉变更 → 保存 */
 async function onDefaultCommentCountChange() {
     const val = parseInt(document.getElementById('setting-default-comment-count').value);
     try {
@@ -241,6 +242,7 @@ async function onDefaultCommentCountChange() {
     }
 }
 
+/** 自动 AI 总结开关 → 保存 */
 async function onToggleAutoAiSummary() {
     const el = document.getElementById('toggle-auto-ai-summary');
     const newVal = !el.classList.contains('on');
@@ -254,6 +256,7 @@ async function onToggleAutoAiSummary() {
     }
 }
 
+/** 实时动画开关 → 保存 */
 async function onToggleRealtimeAnimation() {
     const el = document.getElementById('toggle-realtime-animation');
     const newVal = !el.classList.contains('on');
@@ -267,8 +270,9 @@ async function onToggleRealtimeAnimation() {
     }
 }
 
-// ---- Notification preference handlers ----
+// ---- 通知偏好变更处理 ----
 
+/** 分析完成通知开关 → 保存 */
 async function onToggleAnalysisCompleteNotify() {
     const el = document.getElementById('toggle-analysis-complete-notify');
     const newVal = !el.classList.contains('on');
@@ -282,6 +286,7 @@ async function onToggleAnalysisCompleteNotify() {
     }
 }
 
+/** 异常预警通知开关 → 保存 */
 async function onToggleAnomalyAlert() {
     const el = document.getElementById('toggle-anomaly-alert');
     const newVal = !el.classList.contains('on');
@@ -295,8 +300,9 @@ async function onToggleAnomalyAlert() {
     }
 }
 
-// ---- Account handlers ----
+// ---- 账户信息变更处理 ----
 
+/** 修改用户名 → 弹窗输入 → 调用 API */
 async function onEditUsername() {
     const current = currentSettings && currentSettings.account ? currentSettings.account.username : '';
     const newName = prompt('请输入新的用户名：', current);
@@ -310,6 +316,7 @@ async function onEditUsername() {
     }
 }
 
+/** 修改邮箱 → 弹窗输入 → 调用 API */
 async function onEditEmail() {
     const current = currentSettings && currentSettings.account ? currentSettings.account.email : '';
     const newEmail = prompt('请输入新的邮箱：', current);
@@ -323,6 +330,7 @@ async function onEditEmail() {
     }
 }
 
+/** 重新生成 API Key → 确认后调用 API */
 async function onRegenerateApiKey() {
     if (!confirm('确定要重新生成 API Key 吗？旧的 Key 将立即失效。')) return;
     try {
@@ -334,7 +342,7 @@ async function onRegenerateApiKey() {
     }
 }
 
-// Init
+// 初始化：加载用户信息后获取设置
 initPage().then(() => loadSettings());
 </script>
 </body>

@@ -30,7 +30,6 @@
         "properties": {
           "user_id": { "type": "integer" },
           "username": { "type": "string" },
-          "display_name": { "type": "string", "description": "显示名称" },
           "role": { "type": "string", "description": "角色" },
           "avatar_initial": { "type": "string", "description": "头像首字母" },
           "email": { "type": "string", "format": "email" }
@@ -601,7 +600,7 @@
                   "code": 0,
                   "data": {
                     "token": "eyJhbGciOiJIUzI1NiIs...",
-                    "user": { "user_id": 1, "username": "admin", "display_name": "刘心宇", "role": "管理员", "avatar_initial": "L" }
+                    "user": { "user_id": 1, "username": "admin", "role": "管理员", "avatar_initial": "L" }
                   }
                 }
               }

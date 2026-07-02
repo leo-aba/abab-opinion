@@ -5,7 +5,9 @@
 文档:  http://localhost:8000/docs
 """
 
+import logging
 import os
+import time
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
@@ -17,13 +19,24 @@ from fastapi.staticfiles import StaticFiles
 from backend.config import CORS_ORIGINS, BASE_DIR
 from backend.database import init_db, close_db
 
+# ---------- 日志配置 ----------
+logging.basicConfig(
+    level=logging.DEBUG,
+    format="[%(asctime)s] %(levelname)-7s %(name)s | %(message)s",
+    datefmt="%H:%M:%S",
+)
+logger = logging.getLogger("main")
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """启动时创建表（表已存在则跳过），关闭时释放连接池"""
+    """启动时初始化数据库并注册关闭回调"""
+    logger.info("正在启动服务...")
     await init_db()
+    logger.info("数据库初始化完成")
     yield
     await close_db()
+    logger.info("数据库连接池已释放")
 
 
 app = FastAPI(
@@ -43,14 +56,28 @@ app.add_middleware(
 )
 
 
+# ---------- 请求日志中间件 ----------
+@app.middleware("http")
+async def log_requests(request: Request, call_next):
+    """记录每个请求的方法、路径和响应状态"""
+    start = time.time()
+    response = await call_next(request)
+    elapsed = (time.time() - start) * 1000
+    logger.debug("%s %s → %d (%.1fms)", request.method, request.url.path, response.status_code, elapsed)
+    return response
+
+
 # ---------- 统一异常处理 ----------
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
+    """统一异常处理：记录异常日志并返回标准化 JSON 错误响应"""
     if isinstance(exc, HTTPException):
+        logger.warning("HTTP %d | %s %s — %s", exc.status_code, request.method, request.url.path, exc.detail)
         return JSONResponse(
             status_code=exc.status_code,
             content={"code": exc.status_code, "message": exc.detail, "data": None},
         )
+    logger.error("未处理异常 | %s %s — %s", request.method, request.url.path, str(exc), exc_info=True)
     return JSONResponse(
         status_code=500,
         content={"code": 500, "message": str(exc) or "服务器内部错误", "data": None},
@@ -60,6 +87,7 @@ async def global_exception_handler(request: Request, exc: Exception):
 # ---------- 健康检查 ----------
 @app.get("/health")
 async def health():
+    """健康检查端点 — 供 Docker / K8s 探活使用"""
     return {"status": "ok"}
 
 
@@ -96,7 +124,11 @@ async def serve_frontend(filename: str):
 
     # 1) 精确文件匹配
     if os.path.isfile(safe_path):
-        return FileResponse(safe_path)
+        resp = FileResponse(safe_path)
+        # 开发阶段禁用缓存，方便修改 JS/CSS 后即时生效
+        if safe_path.endswith(('.js', '.css', '.html')):
+            resp.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+        return resp
 
     # 2) 目录 → index.html（如 /example/ → /example/index.html）
     if os.path.isdir(safe_path):

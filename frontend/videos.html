@@ -116,6 +116,7 @@
 <script src="js/api.js"></script>
 <script src="js/common.js"></script>
 <script>
+/** 加载视频列表网格 */
 async function loadVideos() {
     const grid = document.getElementById('video-grid');
 
@@ -163,12 +164,14 @@ async function loadVideos() {
     }
 }
 
+/** 平台枚举 → 平台徽章 HTML */
 function getPlatformBadge(platform) {
     if (platform === 'bilibili') return '<span class="platform-badge bilibili">B站</span>';
     if (platform === 'douyin') return '<span class="platform-badge douyin">抖音</span>';
     return '';
 }
 
+/** 分析状态 → { text, cls } */
 function getStatusLabel(status) {
     switch (status) {
         case 'tracking': return { text: '实时追踪中', cls: 'tracking' };
@@ -179,6 +182,7 @@ function getStatusLabel(status) {
     }
 }
 
+/** 分析状态 → CSS 类名 */
 function getStatusClass(status) {
     switch (status) {
         case 'tracking': return 'tracking';
@@ -189,6 +193,7 @@ function getStatusClass(status) {
     }
 }
 
+/** 防 XSS 的 HTML 转义 */
 function escapeHtml(str) {
     if (!str) return '';
     const div = document.createElement('div');
@@ -196,7 +201,7 @@ function escapeHtml(str) {
     return div.innerHTML;
 }
 
-// Init
+// 初始化：加载用户信息后获取视频列表
 initPage().then(() => loadVideos());
 </script>
 </body>

@@ -15,6 +15,7 @@ _AsyncSessionLocal = None
 
 
 def get_engine():
+    """获取 SQLAlchemy 异步引擎（懒加载单例，仅首次调用时创建）"""
     global _engine
     if _engine is None:
         _engine = create_async_engine(
@@ -24,6 +25,7 @@ def get_engine():
 
 
 def get_sessionmaker():
+    """获取异步 Session 工厂（懒加载单例，仅首次调用时创建）"""
     global _AsyncSessionLocal
     if _AsyncSessionLocal is None:
         _AsyncSessionLocal = async_sessionmaker(

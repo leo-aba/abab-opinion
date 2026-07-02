@@ -100,6 +100,7 @@
 
 <script src="js/api.js"></script>
 <script>
+/** 设置登录/注册按钮的 loading 状态 */
 function setButtonLoading(btn, loading) {
   if (loading) {
     btn.disabled = true;
@@ -113,17 +114,20 @@ function setButtonLoading(btn, loading) {
   }
 }
 
+/** 显示错误提示信息 */
 function showError(elementId, message) {
   const el = document.getElementById(elementId);
   el.textContent = message;
   el.style.display = 'block';
 }
 
+/** 隐藏错误提示信息 */
 function hideError(elementId) {
   const el = document.getElementById(elementId);
   el.style.display = 'none';
 }
 
+/** 执行登录：校验输入、调 API、保存 token 并跳转 Dashboard */
 async function doLogin() {
   const btn = document.getElementById('login-btn');
   hideError('login-error');
@@ -149,16 +153,19 @@ async function doLogin() {
   }
 }
 
+/** 切换到注册卡片 */
 function showRegister() {
   document.getElementById('login-card').style.display = 'none';
   document.getElementById('register-card').style.display = 'block';
 }
 
+/** 切换到登录卡片 */
 function showLogin() {
   document.getElementById('login-card').style.display = 'block';
   document.getElementById('register-card').style.display = 'none';
 }
 
+/** 执行注册：校验输入、调 API、成功后切回登录页并预填用户名 */
 async function doRegister() {
   const username = document.getElementById('reg-username').value.trim();
   const email = document.getElementById('reg-email').value.trim();
@@ -188,12 +195,12 @@ async function doRegister() {
   setButtonLoading(btn, true);
 
   try {
-    await api.register(username, email, password);
-    // Success: switch to login card
+    await api.register(username, email, password, confirmPassword);
+    // 注册成功：切换到登录卡片
     showLogin();
     document.getElementById('login-username').value = username;
     document.getElementById('login-password').value = '';
-    // Clear register form
+    // 清空注册表单
     document.getElementById('reg-username').value = '';
     document.getElementById('reg-email').value = '';
     document.getElementById('reg-password').value = '';
@@ -205,7 +212,7 @@ async function doRegister() {
   }
 }
 
-// Enter key support
+// 回车键自动提交：根据当前显示的卡片判断调用登录还是注册
 document.addEventListener('keydown', function(e) {
   if (e.key === 'Enter') {
     const regCard = document.getElementById('register-card');

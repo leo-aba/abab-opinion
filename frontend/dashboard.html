@@ -185,16 +185,16 @@
 <script src="js/charts.js"></script>
 <script>
   document.addEventListener('DOMContentLoaded', async function() {
-    // 1. Init page — loads user profile, header stats, tracking visibility
+    // 1. 初始化页面：加载用户信息和顶部统计
     await initPage({ loadUser: true, loadHeaderStats: true });
 
-    // 2. Load dashboard summary for stat cards
+    // 2. 加载 Dashboard 统计卡片数据
     try {
       const summary = await api.getDashboardSummary();
       if (summary) {
         setText('total-comments', (summary.total_comments || 0).toLocaleString());
 
-        // Comments change indicator
+        // 评论数变化指示器（↑/↓ 方向和百分比）
         const commentsChangeEl = document.getElementById('total-comments-change');
         if (commentsChangeEl) {
           const dir = summary.total_comments_change_direction;
@@ -207,7 +207,7 @@
 
         setText('total-videos', (summary.total_videos || 0).toLocaleString());
 
-        // Videos change indicator
+        // 视频数变化指示器
         const videosChangeEl = document.getElementById('total-videos-change');
         if (videosChangeEl) {
           const dir = summary.total_videos_change_direction;
@@ -226,7 +226,7 @@
 
         setText('avg-sentiment', summary.avg_sentiment || '—');
 
-        // Sentiment change indicator
+        // 情绪变化指示器
         const sentimentChangeEl = document.getElementById('avg-sentiment-change');
         if (sentimentChangeEl) {
           const dir = summary.avg_sentiment_change_direction;
@@ -245,10 +245,10 @@
       setText('avg-sentiment', '加载失败');
     }
 
-    // 3. Init charts (fetches data internally)
+    // 3. 初始化图表（内部自动拉取数据）
     initDashboardCharts();
 
-    // 4. Load active tracking cards
+    // 4. 加载活跃追踪任务卡片
     try {
       const trackingTasks = await api.getDashboardActiveTracking();
       const section = document.getElementById('dashboard-tracking-section');
@@ -256,11 +256,11 @@
       if (!container) return;
 
       if (!trackingTasks || !Array.isArray(trackingTasks) || trackingTasks.length === 0) {
-        // Keep section hidden
+        // 无活跃追踪任务，保持隐藏
         return;
       }
 
-      // Show section
+      // 显示追踪区域
       section.style.display = '';
 
       let html = '';
@@ -287,10 +287,10 @@
       container.innerHTML = html;
     } catch (e) {
       console.error('Active tracking load failed:', e);
-      // Silently keep section hidden on error
+      // 加载失败保持静默
     }
 
-    // Helper for escaping HTML in tracking card text
+    /** 防 XSS 的 HTML 转义（内联版本） */
     function escapeHTML(str) {
       var div = document.createElement('div');
       div.appendChild(document.createTextNode(str));
