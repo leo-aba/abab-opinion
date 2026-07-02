@@ -330,9 +330,10 @@ let selectedMode = 'tracking';
 let searchType = 'url';
 
 // ──────────────────────────────────────────────
-// Platform / Mode / Param selection (unchanged)
+// Platform / Mode / Param 选择
 // ──────────────────────────────────────────────
 
+/** 选择平台：Bilibili / 抖音 */
 function selectPlatform(platform) {
   selectedPlatform = platform;
   document.getElementById('platformBilibili').classList.remove('selected');
@@ -340,6 +341,7 @@ function selectPlatform(platform) {
   document.getElementById('platform' + (platform === 'bilibili' ? 'Bilibili' : 'Douyin')).classList.add('selected');
 }
 
+/** 选择分析模式：追踪 / 普通 */
 function selectMode(mode) {
   selectedMode = mode;
   document.getElementById('modeTracking').classList.remove('selected');
@@ -347,21 +349,24 @@ function selectMode(mode) {
   document.getElementById(mode === 'tracking' ? 'modeTracking' : 'modeNormal').classList.add('selected');
 }
 
+/** 选中参数选项（评论数量/时间范围/语言） */
 function selectParam(btn, groupId) {
   document.querySelectorAll('#' + groupId + ' .param-option').forEach(b => b.classList.remove('selected'));
   btn.classList.add('selected');
 }
 
 // ──────────────────────────────────────────────
-// Step 2: Search
+// Step 2: 视频搜索
 // ──────────────────────────────────────────────
 
+/** 切换搜索标签（URL/BV号/AV号/关键词） */
 function switchSearchTab(btn, type) {
   document.querySelectorAll('#content-wizard .search-tab').forEach(t => t.classList.remove('active'));
   btn.classList.add('active');
   searchType = type;
 }
 
+/** 执行视频搜索并渲染结果表格 */
 async function searchVideos() {
   const query = document.getElementById('searchInput').value.trim();
   if (!query) {
@@ -398,6 +403,7 @@ async function searchVideos() {
   }
 }
 
+/** 选中视频（高亮按钮，记录选中视频信息） */
 function selectVideo(btn, title, commentCount) {
   document.querySelectorAll('#videoResults .btn-sm.selected-btn').forEach(function(b) {
     b.classList.remove('selected-btn');
@@ -412,9 +418,10 @@ function selectVideo(btn, title, commentCount) {
 }
 
 // ──────────────────────────────────────────────
-// Wizard navigation
+// Wizard 导航
 // ──────────────────────────────────────────────
 
+/** 向导下一步 → 更新步骤面板和指示器；到第4步时加载积分 */
 async function wizardNext(step) {
   wizardStep = step;
   showWizardStep(step);
@@ -426,18 +433,21 @@ async function wizardNext(step) {
   }
 }
 
+/** 向导上一步 */
 function wizardPrev(step) {
   wizardStep = step;
   showWizardStep(step);
   updateStepIndicator(step);
 }
 
+/** 显示/隐藏向导步骤面板 */
 function showWizardStep(step) {
   document.querySelectorAll('.wizard-step').forEach(function(el) { el.classList.remove('active'); });
   var target = document.getElementById('wizStep' + step);
   if (target) target.classList.add('active');
 }
 
+/** 更新顶部步骤指示器状态（当前/已完成/待处理） */
 function updateStepIndicator(step) {
   for (var i = 1; i <= 4; i++) {
     var circle = document.getElementById('stepCircle' + i);
@@ -462,14 +472,16 @@ function updateStepIndicator(step) {
 }
 
 // ──────────────────────────────────────────────
-// Summary helpers
+// 确认页摘要
 // ──────────────────────────────────────────────
 
+/** 获取参数组中已选中的选项文本 */
 function getSelectedParam(groupId) {
   var el = document.querySelector('#' + groupId + ' .param-option.selected');
   return el ? el.textContent : '—';
 }
 
+/** 用当前选择填充确认页摘要 */
 function updateWizardSummary() {
   setText('summaryPlatform', selectedPlatform === 'bilibili' ? 'Bilibili' : '抖音');
   setText('summaryVideo', selectedVideo ? selectedVideo.title : '—');
@@ -483,9 +495,10 @@ function updateWizardSummary() {
 }
 
 // ──────────────────────────────────────────────
-// Credits
+// 积分查询
 // ──────────────────────────────────────────────
 
+/** 查询并显示当前可用积分和预估消耗 */
 async function loadCredits() {
   var countText = getSelectedParam('paramCount');
   var commentCount = countText === '全部' ? 0 : parseInt(countText.replace(/,/g, '')) || 500;
@@ -504,9 +517,10 @@ async function loadCredits() {
 }
 
 // ──────────────────────────────────────────────
-// Start analysis
+// 创建分析任务
 // ──────────────────────────────────────────────
 
+/** 提交分析任务 → 保存元数据到 sessionStorage → 跳转 Pipeline 页 */
 async function startAnalysis() {
   var countText = getSelectedParam('paramCount');
   var commentCount = countText === '全部' ? 0 : parseInt(countText.replace(/,/g, '')) || 500;
@@ -533,27 +547,29 @@ async function startAnalysis() {
 }
 
 // ──────────────────────────────────────────────
-// Utility
+// 工具函数
 // ──────────────────────────────────────────────
 
+/** HTML 转义（防 XSS） */
 function escapeHtml(str) {
   return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
+/** HTML 属性值转义（用于 onclick 等属性中的字符串） */
 function escapeAttr(str) {
   return String(str).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/'/g, '&#39;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
 // ──────────────────────────────────────────────
-// Init
+// 页面初始化
 // ──────────────────────────────────────────────
 
 (function() {
-  // Pre-select defaults
+  // 预选默认值
   selectPlatform('bilibili');
   selectMode('tracking');
 
-  // Load user info and header stats from backend
+  // 加载用户信息和顶部统计
   initPage({ loadUser: true, loadHeaderStats: true });
 })();
 </script>

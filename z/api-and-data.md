@@ -38,7 +38,6 @@ GET /api/user/profile
   "data": {
     "user_id": 1,
     "username": "admin",
-    "display_name": "刘心宇",
     "role": "管理员",
     "avatar_initial": "L",
     "email": "admin@opinion.ai"
@@ -114,7 +113,6 @@ Content-Type: application/json
     "user": {
       "user_id": 1,
       "username": "admin",
-      "display_name": "刘心宇",
       "role": "管理员",
       "avatar_initial": "L"
     }

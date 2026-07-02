@@ -134,6 +134,7 @@
 let currentPage = 1;
 let totalPages = 1;
 
+/** 加载历史记录列表（支持筛选、排序、分页） */
 async function loadHistory(page) {
     const tbody = document.getElementById('history-tbody');
     const pagination = document.getElementById('history-pagination');
@@ -190,7 +191,7 @@ async function loadHistory(page) {
         }
         tbody.innerHTML = html;
 
-        // Render pagination
+        // 渲染分页导航
         renderPagination(pagination);
 
     } catch (e) {
@@ -200,6 +201,7 @@ async function loadHistory(page) {
     }
 }
 
+/** 渲染分页控件（← 页码 ... →） */
 function renderPagination(container) {
     let pagHtml = '';
     pagHtml += '<button class="page-btn"' + (currentPage <= 1 ? ' disabled' : '') + ' onclick="loadHistory(' + (currentPage - 1) + ')">&#8592;</button>';
@@ -230,6 +232,7 @@ function renderPagination(container) {
     container.innerHTML = pagHtml;
 }
 
+/** 防 XSS 的 HTML 转义 */
 function escapeHtml(str) {
     if (!str) return '';
     const div = document.createElement('div');
@@ -237,7 +240,7 @@ function escapeHtml(str) {
     return div.innerHTML;
 }
 
-// Init
+// 初始化：加载用户信息后获取历史记录第 1 页
 initPage().then(() => loadHistory(1));
 </script>
 

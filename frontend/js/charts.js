@@ -1,9 +1,15 @@
 // ============================================================
-// CHART INITIALIZATION — 所有图表函数接受数据参数，不含死数据
+// CHART INITIALIZATION — 所有图表渲染函数
+// 每个函数负责销毁旧实例 + 创建新 Chart.js 实例
+// 全局变量保存各图表实例引用，用于销毁和切换
 // ============================================================
 let trendChartInstance, sentimentPieInstance, topicBarInstance;
 let resultsTrendInstance, resultsPieInstance, sunburstInstance, radarInstance, trendsDetailInstance;
 
+/**
+ * 安全销毁 Chart.js 实例（跳过已销毁或 null 的实例）
+ * @param {Chart|null} instance - Chart.js 实例
+ */
 function destroyChart(instance) {
   if (instance) instance.destroy();
 }
@@ -12,7 +18,10 @@ function destroyChart(instance) {
 // Dashboard Charts
 // ============================================================
 
-// 评论增长趋势 — data: { labels: [], values: [] }
+/**
+ * 渲染评论增长趋势折线图（Dashboard）
+ * @param {{labels: string[], values: number[]}} data
+ */
 function renderTrendChart(data) {
   destroyChart(trendChartInstance);
   const ctx = document.getElementById('trendChart');
@@ -41,7 +50,10 @@ function renderTrendChart(data) {
   });
 }
 
-// 情绪占比 — data: { positive: number, negative: number, neutral: number }
+/**
+ * 渲染情绪占比环形图（Dashboard）
+ * @param {{positive: number, negative: number, neutral: number}} data
+ */
 function renderSentimentPie(data) {
   destroyChart(sentimentPieInstance);
   const ctx = document.getElementById('sentimentPie');
@@ -64,7 +76,10 @@ function renderSentimentPie(data) {
   });
 }
 
-// TOP10 热门 Topic — data: [{ topic_name, comment_count }]
+/**
+ * 渲染 TOP10 热门 Topic 横向柱状图（Dashboard）
+ * @param {Array<{topic_name: string, comment_count: number}>} data
+ */
 function renderTopicBar(data) {
   destroyChart(topicBarInstance);
   const ctx = document.getElementById('topicBarChart');
@@ -94,7 +109,10 @@ function renderTopicBar(data) {
 // Results Charts
 // ============================================================
 
-// 结果页趋势 — data: { labels: [], values: [] }
+/**
+ * 渲染结果页评论趋势折线图
+ * @param {{labels: string[], values: number[]}} data
+ */
 function renderResultsTrend(data) {
   destroyChart(resultsTrendInstance);
   const ctx = document.getElementById('resultsTrendChart');
@@ -120,7 +138,10 @@ function renderResultsTrend(data) {
   });
 }
 
-// 结果页情绪饼图
+/**
+ * 渲染结果页情绪占比环形图
+ * @param {{positive: number, negative: number, neutral: number}} data
+ */
 function renderResultsPie(data) {
   destroyChart(resultsPieInstance);
   const ctx = document.getElementById('resultsPieChart');
@@ -143,7 +164,10 @@ function renderResultsPie(data) {
   });
 }
 
-// 属性情感旭日图 — data: [{ label, value, color }]
+/**
+ * 渲染属性情感旭日图（多级环形图）
+ * @param {Array<{label: string, value: number, color: string}>} data
+ */
 function renderSunburst(data) {
   destroyChart(sunburstInstance);
   const ctx = document.getElementById('sunburstChart');
@@ -166,7 +190,10 @@ function renderSunburst(data) {
   });
 }
 
-// 情感雷达图 — data: { labels: [], positive_scores: [], negative_scores: [] }
+/**
+ * 渲染情感雷达图（正面 vs 负面各维度对比）
+ * @param {{labels: string[], positive_scores: number[], negative_scores: number[]}} data
+ */
 function renderRadar(data) {
   destroyChart(radarInstance);
   const ctx = document.getElementById('radarChart');
@@ -188,7 +215,10 @@ function renderRadar(data) {
   });
 }
 
-// 时间趋势详情 — data: { labels: [], datasets: [{ label, values, color }] }
+/**
+ * 渲染时间趋势详情多线图（按天/小时/周，正面/负面/总计）
+ * @param {{labels: string[], datasets: Array<{label: string, values: number[], color: string}>}} data
+ */
 function renderTrendsDetail(data) {
   destroyChart(trendsDetailInstance);
   const ctx = document.getElementById('trendsDetailChart');
@@ -215,8 +245,13 @@ function renderTrendsDetail(data) {
 }
 
 // ============================================================
-// Dashboard 整体渲染（一次拉取所有图表数据）
+// Dashboard 整体渲染
 // ============================================================
+
+/**
+ * Dashboard 页面 — 并行拉取 3 个图表接口并渲染
+ * @returns {Promise<{trend: object, sentiment: object, topics: Array}|null>}
+ */
 async function initDashboardCharts() {
   try {
     const [trend, sentiment, topics] = await Promise.all([

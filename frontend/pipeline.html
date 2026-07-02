@@ -177,18 +177,19 @@
         // State
         // ============================================================
         let taskId = null;
-        let selectedMode = 'normal'; // default; overridden from sessionStorage
-        let eventSource = null;
-        let pollTimer = null;
-        let trackingId = null;
-        let trackingInterval = null;
-        let trackingActive = false;
-        let trackingDuration = 0;
-        let trackingDurationTimer = null;
+        let selectedMode = 'normal';        // 从 sessionStorage 读取
+        let eventSource = null;             // SSE 连接
+        let pollTimer = null;               // 轮询定时器
+        let trackingId = null;              // 追踪任务 ID
+        let trackingInterval = null;        // 追踪状态轮询定时器
+        let trackingActive = false;         // 追踪是否激活
+        let trackingDuration = 0;           // 追踪已运行秒数
+        let trackingDurationTimer = null;   // 追踪计时器
 
         // ============================================================
-        // Log helpers
+        // 日志输出
         // ============================================================
+        /** 向日志面板添加一行日志 */
         function addLog(time, msg, type) {
             const container = document.getElementById('logEntries');
             const div = document.createElement('div');
@@ -203,7 +204,7 @@
         }
 
         // ============================================================
-        // Pipeline step rendering
+        // Pipeline 步骤渲染
         // ============================================================
         const STEP_ICONS = [
             '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>',
@@ -217,6 +218,7 @@
         const DONE_ICON = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M5 13l4 4L19 7"/></svg>';
         const RUNNING_ICON = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>';
 
+        /** 渲染 Pipeline 步骤列表 HTML */
         function renderPipelineSteps(steps) {
             const container = document.getElementById('pipelineSteps');
             if (!steps || steps.length === 0) {
@@ -243,6 +245,7 @@
             container.innerHTML = html;
         }
 
+        /** 更新单个步骤的状态图标和文本 */
         function setPipeState(step, state) {
             const icon = document.getElementById('pipeIcon' + step);
             const status = document.getElementById('pipeStatus' + step);
@@ -267,12 +270,13 @@
         }
 
         // ============================================================
-        // SSE-based progress
+        // SSE 实时进度
         // ============================================================
+        /** 建立 SSE 连接接收分析进度，失败时自动降级到轮询 */
         function connectSSE() {
             if (!taskId) {
                 addLog(getTimeStr(), '错误: 未找到分析任务ID', 'error');
-                startPolling(); // fallback
+                startPolling(); // 降级
                 return;
             }
 
@@ -284,7 +288,7 @@
                 eventSource.addEventListener('progress', function (e) {
                     try {
                         const data = JSON.parse(e.data);
-                        // Update overall progress
+                        // 更新整体进度百分比和提示
                         if (data.overall_pct !== undefined) {
                             document.getElementById('pipelinePct').textContent = data.overall_pct + '%';
                             document.getElementById('progressBar').style.width = data.overall_pct + '%';
@@ -292,7 +296,7 @@
                         if (data.overall_hint) {
                             document.getElementById('progressHint').textContent = data.overall_hint;
                         }
-                        // Update individual steps
+                        // 更新各步骤状态
                         if (data.steps && Array.isArray(data.steps)) {
                             data.steps.forEach(function (s) {
                                 setPipeState(s.step, s.state);
@@ -342,7 +346,7 @@
                 });
 
                 eventSource.onerror = function () {
-                    // SSE connection failed — fallback to polling
+                    // SSE 连接失败 → 降级到轮询模式
                     addLog(getTimeStr(), '实时数据流连接失败，切换到轮询模式', 'warn');
                     closeSSE();
                     startPolling();
@@ -353,6 +357,7 @@
             }
         }
 
+        /** 关闭 SSE 连接 */
         function closeSSE() {
             if (eventSource) {
                 eventSource.close();
@@ -361,8 +366,9 @@
         }
 
         // ============================================================
-        // Polling fallback
+        // 轮询备选方案
         // ============================================================
+        /** SSE 不可用时启动轮询（每 2 秒） */
         function startPolling() {
             if (!taskId) return;
             if (pollTimer) return;
@@ -381,7 +387,7 @@
                         document.getElementById('progressHint').textContent = progress.overall_hint;
                     }
 
-                    // Render or update steps
+                    // 首次渲染步骤列表
                     if (progress.steps && Array.isArray(progress.steps)) {
                         if (!window._stepsRendered) {
                             renderPipelineSteps(progress.steps);
@@ -392,17 +398,17 @@
                         });
                     }
 
-                    // Process new logs
+                    // 处理日志增量更新
                     if (progress.logs && Array.isArray(progress.logs)) {
                         if (!window._logsRendered) {
-                            // Clear initial placeholder and render all logs
+                            // 首次加载：清空占位符并渲染全部日志
                             document.getElementById('logEntries').innerHTML = '';
                             progress.logs.forEach(function (l) {
                                 addLog(l.time || getTimeStr(), l.message, l.type || 'info');
                             });
                             window._logsRendered = true;
                         } else {
-                            // Only append new logs
+                            // 增量追加新日志
                             var existingCount = window._lastLogCount || 0;
                             for (var i = existingCount; i < progress.logs.length; i++) {
                                 var l = progress.logs[i];
@@ -412,7 +418,7 @@
                         }
                     }
 
-                    // Check completion
+                    // 检查完成/失败状态
                     if (progress.status === 'completed' || progress.status === 'done') {
                         clearInterval(pollTimer);
                         pollTimer = null;
@@ -439,15 +445,16 @@
                     }
                 } catch (err) {
                     console.error('Poll error:', err);
-                    // Will retry on next interval
+                    // 下次轮询自动重试
                 }
             }
 
-            // First immediate poll to get initial data and render steps
+            // 首次立即轮询获取初始数据
             poll();
             pollTimer = setInterval(poll, 2000);
         }
 
+        /** 停止轮询 */
         function stopPolling() {
             if (pollTimer) {
                 clearInterval(pollTimer);
@@ -456,8 +463,9 @@
         }
 
         // ============================================================
-        // Tracking mode
+        // 追踪模式
         // ============================================================
+        /** 分析完成后启动追踪模式：注册追踪任务、开始轮询状态 */
         async function initTrackingMode() {
             try {
                 const tracking = await api.startTracking(taskId);
@@ -466,11 +474,11 @@
 
                 document.getElementById('tracking-extension').style.display = 'block';
 
-                // Show nav tracking item
+                // 显示侧边栏追踪入口
                 var navTrack = document.getElementById('nav-tracking');
                 if (navTrack) navTrack.style.display = '';
 
-                // Start duration counter
+                // 开始计时
                 trackingDuration = 0;
                 updateTrackingDuration();
                 trackingDurationTimer = setInterval(function () {
@@ -478,7 +486,7 @@
                     updateTrackingDuration();
                 }, 1000);
 
-                // Set initial values
+                // 记录初始积分
                 if (tracking.initial_credits !== undefined) {
                     window._trackingInitialCredits = tracking.initial_credits;
                 }
@@ -488,7 +496,7 @@
 
                 addLog(getTimeStr(), '实时追踪已启动 (ID: ' + trackingId + ')', 'success');
 
-                // Start polling tracking status
+                // 开始轮询追踪状态（每 5 秒）
                 updateTrackingUI();
                 trackingInterval = setInterval(pollTrackingStatus, 5000);
             } catch (err) {
@@ -497,6 +505,7 @@
             }
         }
 
+        /** 轮询追踪状态并更新 UI */
         async function pollTrackingStatus() {
             if (!trackingActive || !trackingId) return;
             try {
@@ -504,7 +513,7 @@
                 updateTrackingUIFromData(status);
             } catch (err) {
                 console.error('Failed to poll tracking status:', err);
-                // If we get a 404, tracking may have been stopped server-side
+                // 404 表示服务器端已停止追踪
                 if (err.message && err.message.indexOf('404') !== -1) {
                     addLog(getTimeStr(), '追踪已被服务器停止', 'warn');
                     cleanupTracking();
@@ -512,6 +521,7 @@
             }
         }
 
+        /** 用追踪状态更新 UI 各项指标 */
         function updateTrackingUIFromData(data) {
             if (!data) return;
 
@@ -527,7 +537,7 @@
             var tc = document.getElementById('tracking-total-comments');
             if (tc && data.total_comments !== undefined) tc.textContent = data.total_comments.toLocaleString();
 
-            // Credits bar
+            // 积分进度条
             if (data.credits_remaining !== undefined && data.credits_total !== undefined && data.credits_total > 0) {
                 var pct = Math.max(0, Math.floor(data.credits_remaining / data.credits_total * 100));
                 var cb = document.getElementById('tracking-credits-bar');
@@ -536,29 +546,31 @@
                 if (cp) cp.textContent = pct + '%';
             }
 
-            // Auto-stop if credits exhausted
+            // 积分耗尽自动停止
             if (data.credits_remaining !== undefined && data.credits_remaining <= 0 && data.active === false) {
                 addLog(getTimeStr(), '积分已耗尽，追踪自动停止', 'warn');
                 cleanupTracking();
             }
 
-            // Check if server says tracking is no longer active
+            // 服务端标记不活跃
             if (data.active === false && trackingActive) {
                 addLog(getTimeStr(), '追踪已结束', 'info');
                 cleanupTracking();
             }
         }
 
+        /** 刷新追踪 UI（计时器等） */
         function updateTrackingUI() {
-            // Update duration display
             updateTrackingDuration();
         }
 
+        /** 更新追踪运行时长显示 */
         function updateTrackingDuration() {
             var dur = document.getElementById('tracking-duration');
             if (dur) dur.textContent = '运行中 ' + formatDuration(trackingDuration);
         }
 
+        /** 手动停止追踪 */
         async function stopTracking() {
             if (!trackingActive) return;
 
@@ -577,12 +589,12 @@
                 }
             } catch (err) {
                 addLog(getTimeStr(), '停止追踪请求失败: ' + err.message, 'error');
-                // Clean up UI anyway
             }
 
             cleanupTracking();
         }
 
+        /** 清理追踪状态：清除定时器、隐藏 UI */
         function cleanupTracking() {
             trackingActive = false;
             if (trackingInterval) { clearInterval(trackingInterval); trackingInterval = null; }
@@ -592,15 +604,15 @@
         }
 
         // ============================================================
-        // Initialization
+        // 页面初始化
         // ============================================================
         window.addEventListener('DOMContentLoaded', async function () {
-            // 1. Init page (load user, header stats)
+            // 1. 加载用户信息
             initPage({ loadHeaderStats: false }).catch(function (err) {
                 console.error('initPage failed:', err);
             });
 
-            // 2. Read task ID and mode from sessionStorage
+            // 2. 从 sessionStorage 读取任务信息
             taskId = sessionStorage.getItem('analysisTaskId');
             selectedMode = sessionStorage.getItem('analysisMode') || 'normal';
 
@@ -617,11 +629,11 @@
             addLog(getTimeStr(), '分析任务ID: ' + taskId, 'info');
             addLog(getTimeStr(), '分析模式: ' + (selectedMode === 'tracking' ? '追踪模式' : '普通模式'), 'info');
 
-            // 3. Try SSE first; falls back to polling on failure
+            // 3. 优先尝试 SSE 连接，失败自动降级轮询
             connectSSE();
         });
 
-        // Cleanup on page unload
+        // 页面离开时清理所有连接和定时器
         window.addEventListener('beforeunload', function () {
             closeSSE();
             stopPolling();
