@@ -100,14 +100,10 @@ async function initPage(options) {
       setText('stat-hot-topic', result.headerStats.hot_topic || '—');
     }
 
-    // 检查追踪状态
+    // 检查追踪状态（仅控制实时指示点）
     try {
       const trackingStatus = await api.hasActiveTracking();
-      const navTrack = document.getElementById('nav-tracking');
       const navDot = document.getElementById('sidebar-tracking-dot');
-      if (navTrack && trackingStatus.has_active) {
-        navTrack.style.display = '';
-      }
       if (navDot && trackingStatus.has_active) {
         navDot.style.display = '';
       }
