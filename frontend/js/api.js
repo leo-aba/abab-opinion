@@ -40,15 +40,19 @@ async function request(method, path, body) {
     throw new Error('网络错误，无法连接服务器');
   }
 
-  // 检查 HTTP 状态码
+  // 检查 HTTP 状态码 — 优先读取后端的错误信息
   if (!res.ok) {
-    if (res.status === 404) {
-      throw new Error('接口不存在 (404)');
-    }
-    if (res.status === 500) {
-      throw new Error('服务器内部错误 (500)');
-    }
-    throw new Error('请求失败 (HTTP ' + res.status + ')');
+    let detail = '请求失败 (HTTP ' + res.status + ')';
+    try {
+      const errJson = await res.json();
+      // FastAPI 默认错误格式: {"detail": "..."} 或 {"detail": [...]}
+      if (errJson.message) detail = errJson.message;
+      else if (typeof errJson.detail === 'string') detail = errJson.detail;
+      else if (Array.isArray(errJson.detail) && errJson.detail.length > 0) {
+        detail = errJson.detail.map(e => e.msg).join('; ');
+      }
+    } catch (_) {}
+    throw new Error(detail);
   }
 
   // 检查响应是否是 JSON

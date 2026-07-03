@@ -11,7 +11,7 @@ import time
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
-from fastapi.exceptions import HTTPException
+from fastapi.exceptions import HTTPException, RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, FileResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
@@ -68,19 +68,36 @@ async def log_requests(request: Request, call_next):
 
 
 # ---------- 统一异常处理 ----------
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    """Pydantic 请求校验失败 → 422，提取第一条错误消息"""
+    errors = exc.errors()
+    first_msg = errors[0]["msg"] if errors else "请求参数校验失败"
+    logger.warning("422 校验失败 | %s %s — %s", request.method, request.url.path, first_msg)
+    return JSONResponse(
+        status_code=422,
+        content={"code": 422, "message": first_msg, "data": None},
+    )
+
+
+@app.exception_handler(HTTPException)
+async def http_exception_handler(request: Request, exc: HTTPException):
+    """手动抛出的 HTTPException（如 401/403/409/422）"""
+    logger.warning("HTTP %d | %s %s — %s", exc.status_code, request.method, request.url.path, exc.detail)
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={"code": exc.status_code, "message": exc.detail, "data": None},
+    )
+
+
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
-    """统一异常处理：记录异常日志并返回标准化 JSON 错误响应"""
-    if isinstance(exc, HTTPException):
-        logger.warning("HTTP %d | %s %s — %s", exc.status_code, request.method, request.url.path, exc.detail)
-        return JSONResponse(
-            status_code=exc.status_code,
-            content={"code": exc.status_code, "message": exc.detail, "data": None},
-        )
+    """未预料到的异常 → 500"""
     logger.error("未处理异常 | %s %s — %s", request.method, request.url.path, str(exc), exc_info=True)
     return JSONResponse(
         status_code=500,
-        content={"code": 500, "message": str(exc) or "服务器内部错误", "data": None},
+        content={"code": 500, "message": "服务器内部错误", "data": None},
     )
 
 
