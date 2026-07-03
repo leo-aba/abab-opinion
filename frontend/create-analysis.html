@@ -99,75 +99,34 @@
         <div class="step-indicator" style="display:flex;align-items:flex-start;">
           <div class="step-dot" style="flex-direction:column;align-items:center;">
             <div class="step-circle current" id="stepCircle1">1</div>
-            <div class="step-label active" id="stepLabel1">选择平台</div>
+            <div class="step-label active" id="stepLabel1">搜索视频</div>
           </div>
           <div class="step-line" id="stepLine1" style="margin-top:17px;"></div>
           <div class="step-dot" style="flex-direction:column;align-items:center;">
             <div class="step-circle" id="stepCircle2">2</div>
-            <div class="step-label" id="stepLabel2">搜索视频</div>
+            <div class="step-label" id="stepLabel2">分析参数</div>
           </div>
           <div class="step-line" id="stepLine2" style="margin-top:17px;"></div>
           <div class="step-dot" style="flex-direction:column;align-items:center;">
             <div class="step-circle" id="stepCircle3">3</div>
-            <div class="step-label" id="stepLabel3">分析参数</div>
-          </div>
-          <div class="step-line" id="stepLine3" style="margin-top:17px;"></div>
-          <div class="step-dot" style="flex-direction:column;align-items:center;">
-            <div class="step-circle" id="stepCircle4">4</div>
-            <div class="step-label" id="stepLabel4">开始分析</div>
+            <div class="step-label" id="stepLabel3">开始分析</div>
           </div>
         </div>
 
-        <!-- Step 1: Platform Selection -->
+        <!-- Step 1: Video Search -->
         <div class="wizard-step active" id="wizStep1">
-          <div style="text-align:center;margin-bottom:32px;">
-            <h3 style="font-size:20px;font-weight:700;color:var(--text-dark);margin-bottom:8px;">请选择平台</h3>
-            <p style="font-size:14px;color:var(--text-secondary-dark);">选择您要分析评论的视频平台</p>
-          </div>
-          <div class="platform-cards">
-            <div class="platform-card selected" id="platformBilibili" onclick="selectPlatform('bilibili')">
-              <div class="check-badge">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" width="16" height="16"><polyline points="20 6 9 17 4 12"/></svg>
-              </div>
-              <div class="platform-logo bilibili">B</div>
-              <h4>Bilibili</h4>
-              <p>B站视频评论分析</p>
-            </div>
-            <div class="platform-card" id="platformDouyin" onclick="selectPlatform('douyin')">
-              <div class="check-badge">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" width="16" height="16"><polyline points="20 6 9 17 4 12"/></svg>
-              </div>
-              <div class="platform-logo douyin">D</div>
-              <h4>抖音</h4>
-              <p>抖音短视频评论分析</p>
-            </div>
-          </div>
-          <div class="wizard-nav">
-            <div></div>
-            <button class="btn-primary" style="width:auto;padding:10px 28px;font-size:14px;" onclick="wizardNext(2)">下一步 →</button>
-          </div>
-        </div>
-
-        <!-- Step 2: Video Search -->
-        <div class="wizard-step" id="wizStep2">
           <div style="text-align:center;margin-bottom:28px;">
             <h3 style="font-size:20px;font-weight:700;color:var(--text-dark);margin-bottom:8px;">搜索视频</h3>
-            <p style="font-size:14px;color:var(--text-secondary-dark);">通过 URL、BV号、AV号或关键词查找视频</p>
-          </div>
-          <div class="search-tabs">
-            <button class="search-tab active" onclick="switchSearchTab(this,'url')">URL</button>
-            <button class="search-tab" onclick="switchSearchTab(this,'bv')">BV号</button>
-            <button class="search-tab" onclick="switchSearchTab(this,'av')">AV号</button>
-            <button class="search-tab" onclick="switchSearchTab(this,'keyword')">关键词</button>
+            <p style="font-size:14px;color:var(--text-secondary-dark);">输入B站或抖音视频URL链接查找视频</p>
           </div>
           <div class="search-input-row">
-            <input type="text" id="searchInput" placeholder="请输入搜索内容...">
+            <input type="text" id="searchInput" placeholder="请输入视频url">
             <button class="btn-primary" style="width:auto;padding:10px 24px;font-size:14px;" onclick="searchVideos()">搜索</button>
           </div>
+          <p style="margin-top:8px;font-size:12px;color:var(--text-secondary);">目前仅支持 <strong>Bilibili</strong>（bilibili.com）和 <strong>抖音</strong>（douyin.com）平台</p>
           <table class="video-result-table" id="videoResults">
             <thead>
               <tr>
-                <th>封面</th>
                 <th>标题</th>
                 <th>UP主</th>
                 <th>评论数</th>
@@ -175,17 +134,17 @@
               </tr>
             </thead>
             <tbody id="videoResultsBody">
-              <tr><td colspan="5" style="text-align:center;padding:40px 20px;color:var(--text-secondary-dark);">请输入搜索内容后点击搜索</td></tr>
+              <tr><td colspan="4" style="text-align:center;padding:40px 20px;color:var(--text-secondary-dark);">请输入视频url后点击搜索</td></tr>
             </tbody>
           </table>
           <div class="wizard-nav">
-            <button class="btn-outline" onclick="wizardPrev(1)">← 上一步</button>
-            <button class="btn-primary" style="width:auto;padding:10px 28px;font-size:14px;" onclick="wizardNext(3)">下一步 →</button>
+            <div></div>
+            <button class="btn-primary" style="width:auto;padding:10px 28px;font-size:14px;" onclick="wizardNext(2)">下一步 →</button>
           </div>
         </div>
 
-        <!-- Step 3: Analysis Parameters -->
-        <div class="wizard-step" id="wizStep3">
+        <!-- Step 2: Analysis Parameters -->
+        <div class="wizard-step" id="wizStep2">
           <div style="text-align:center;margin-bottom:28px;">
             <h3 style="font-size:20px;font-weight:700;color:var(--text-dark);margin-bottom:8px;">配置分析参数</h3>
             <p style="font-size:14px;color:var(--text-secondary-dark);">自定义分析范围以获得精准洞察</p>
@@ -259,13 +218,13 @@
           </div>
 
           <div class="wizard-nav">
-            <button class="btn-outline" onclick="wizardPrev(2)">← 上一步</button>
-            <button class="btn-primary" style="width:auto;padding:10px 28px;font-size:14px;" onclick="wizardNext(4)">下一步 →</button>
+            <button class="btn-outline" onclick="wizardPrev(1)">← 上一步</button>
+            <button class="btn-primary" style="width:auto;padding:10px 28px;font-size:14px;" onclick="wizardNext(3)">下一步 →</button>
           </div>
         </div>
 
-        <!-- Step 4: Confirmation -->
-        <div class="wizard-step" id="wizStep4">
+        <!-- Step 3: Confirmation -->
+        <div class="wizard-step" id="wizStep3">
           <div style="text-align:center;margin-bottom:28px;">
             <h3 style="font-size:20px;font-weight:700;color:var(--text-dark);margin-bottom:8px;">确认并开始分析</h3>
             <p style="font-size:14px;color:var(--text-secondary-dark);">检查您的分析配置</p>
@@ -273,10 +232,6 @@
 
           <div class="wizard-summary">
             <h4>分析配置摘要</h4>
-            <div class="summary-row">
-              <span class="label">平台</span>
-              <span class="value" id="summaryPlatform">Bilibili</span>
-            </div>
             <div class="summary-row">
               <span class="label">视频</span>
               <span class="value" id="summaryVideo">—</span>
@@ -309,7 +264,7 @@
           </div>
 
           <div class="wizard-nav">
-            <button class="btn-outline" onclick="wizardPrev(3)">← 上一步</button>
+            <button class="btn-outline" onclick="wizardPrev(2)">← 上一步</button>
             <div></div>
           </div>
         </div>
@@ -324,22 +279,12 @@
 <script src="js/common.js"></script>
 <script>
 let wizardStep = 1;
-let selectedPlatform = 'bilibili';
-let selectedVideo = null;       // { title, bvid, avid, url, uploader, comment_count, cover_url }
+let selectedVideo = null;       // { title, comment_count }
 let selectedMode = 'tracking';
-let searchType = 'url';
 
 // ──────────────────────────────────────────────
-// Platform / Mode / Param 选择
+// Mode / Param 选择
 // ──────────────────────────────────────────────
-
-/** 选择平台：Bilibili / 抖音 */
-function selectPlatform(platform) {
-  selectedPlatform = platform;
-  document.getElementById('platformBilibili').classList.remove('selected');
-  document.getElementById('platformDouyin').classList.remove('selected');
-  document.getElementById('platform' + (platform === 'bilibili' ? 'Bilibili' : 'Douyin')).classList.add('selected');
-}
 
 /** 选择分析模式：追踪 / 普通 */
 function selectMode(mode) {
@@ -359,38 +304,27 @@ function selectParam(btn, groupId) {
 // Step 2: 视频搜索
 // ──────────────────────────────────────────────
 
-/** 切换搜索标签（URL/BV号/AV号/关键词） */
-function switchSearchTab(btn, type) {
-  document.querySelectorAll('#content-wizard .search-tab').forEach(t => t.classList.remove('active'));
-  btn.classList.add('active');
-  searchType = type;
-}
-
 /** 执行视频搜索并渲染结果表格 */
 async function searchVideos() {
   const query = document.getElementById('searchInput').value.trim();
   if (!query) {
-    alert('请输入搜索内容');
+    alert('请输入视频url');
     return;
   }
 
   const tbody = document.getElementById('videoResultsBody');
-  tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:40px 20px;color:var(--text-secondary-dark);">搜索中...</td></tr>';
+  tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;padding:40px 20px;color:var(--text-secondary-dark);">搜索中...</td></tr>';
 
   try {
-    const videos = await api.searchVideos(selectedPlatform, searchType, query);
+    var videos = await api.searchVideos('', 'url', query);
     if (!videos || videos.length === 0) {
-      tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:40px 20px;color:var(--text-secondary-dark);">未找到视频</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;padding:40px 20px;color:var(--text-secondary-dark);">未找到视频</td></tr>';
       return;
     }
 
     let html = '';
     videos.forEach(function(v) {
-      const coverHtml = v.cover_url
-        ? '<img src="' + escapeHtml(v.cover_url) + '" alt="" class="video-cover" style="width:80px;height:45px;object-fit:cover;border-radius:4px;">'
-        : '<div class="video-cover" style="display:flex;align-items:center;justify-content:center;font-size:12px;color:var(--text-secondary);">封面</div>';
       html += '<tr>' +
-        '<td>' + coverHtml + '</td>' +
         '<td>' + escapeHtml(v.title || '—') + '</td>' +
         '<td>' + escapeHtml(v.uploader || '—') + '</td>' +
         '<td>' + (v.comment_count != null ? v.comment_count.toLocaleString() : '—') + '</td>' +
@@ -399,7 +333,7 @@ async function searchVideos() {
     });
     tbody.innerHTML = html;
   } catch (e) {
-    tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:40px 20px;color:#e53e3e;">搜索失败：' + escapeHtml(e.message) + '</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;padding:40px 20px;color:#e53e3e;">搜索失败：' + escapeHtml(e.message) + '</td></tr>';
   }
 }
 
@@ -421,13 +355,13 @@ function selectVideo(btn, title, commentCount) {
 // Wizard 导航
 // ──────────────────────────────────────────────
 
-/** 向导下一步 → 更新步骤面板和指示器；到第4步时加载积分 */
+/** 向导下一步 → 更新步骤面板和指示器；到第3步时加载积分 */
 async function wizardNext(step) {
   wizardStep = step;
   showWizardStep(step);
   updateStepIndicator(step);
 
-  if (step === 4) {
+  if (step === 3) {
     updateWizardSummary();
     await loadCredits();
   }
@@ -449,18 +383,18 @@ function showWizardStep(step) {
 
 /** 更新顶部步骤指示器状态（当前/已完成/待处理） */
 function updateStepIndicator(step) {
-  for (var i = 1; i <= 4; i++) {
+  for (var i = 1; i <= 3; i++) {
     var circle = document.getElementById('stepCircle' + i);
     var label = document.getElementById('stepLabel' + i);
     var line = document.getElementById('stepLine' + i);
     circle.classList.remove('current', 'done');
     label.classList.remove('active', 'done');
-    if (i < 4 && line) line.classList.remove('done');
+    if (i < 3 && line) line.classList.remove('done');
     if (i < step) {
       circle.classList.add('done');
       circle.textContent = '✓';
       label.classList.add('done');
-      if (i < 4 && line) line.classList.add('done');
+      if (i < 3 && line) line.classList.add('done');
     } else if (i === step) {
       circle.classList.add('current');
       circle.textContent = i;
@@ -483,7 +417,6 @@ function getSelectedParam(groupId) {
 
 /** 用当前选择填充确认页摘要 */
 function updateWizardSummary() {
-  setText('summaryPlatform', selectedPlatform === 'bilibili' ? 'Bilibili' : '抖音');
   setText('summaryVideo', selectedVideo ? selectedVideo.title : '—');
   setText('summaryCount', getSelectedParam('paramCount'));
   setText('summaryTime', getSelectedParam('paramTime'));
@@ -526,9 +459,9 @@ async function startAnalysis() {
   var commentCount = countText === '全部' ? 0 : parseInt(countText.replace(/,/g, '')) || 500;
 
   var params = {
-    platform: selectedPlatform,
     mode: selectedMode,
     video_title: selectedVideo ? selectedVideo.title : '',
+    video_url: document.getElementById('searchInput').value.trim(),
     comment_count: commentCount,
     time_range: getSelectedParam('paramTime'),
     language: getSelectedParam('paramLang')
@@ -538,7 +471,6 @@ async function startAnalysis() {
     var result = await api.createAnalysis(params);
     sessionStorage.setItem('taskId', result.task_id);
     sessionStorage.setItem('analysisMode', selectedMode);
-    sessionStorage.setItem('analysisPlatform', selectedPlatform);
     sessionStorage.setItem('analysisVideo', selectedVideo ? selectedVideo.title : '');
     window.location.href = 'pipeline.html';
   } catch (e) {
@@ -565,11 +497,7 @@ function escapeAttr(str) {
 // ──────────────────────────────────────────────
 
 (function() {
-  // 预选默认值
-  selectPlatform('bilibili');
   selectMode('tracking');
-
-  // 加载用户信息和顶部统计
   initPage({ loadUser: true, loadHeaderStats: true });
 })();
 </script>
