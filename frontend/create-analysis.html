@@ -152,22 +152,15 @@
         <div class="wizard-step" id="wizStep2">
           <div style="text-align:center;margin-bottom:28px;">
             <h3 style="font-size:20px;font-weight:700;color:var(--text-dark);margin-bottom:8px;">搜索视频</h3>
-            <p style="font-size:14px;color:var(--text-secondary-dark);">通过 URL、BV号、AV号或关键词查找视频</p>
-          </div>
-          <div class="search-tabs">
-            <button class="search-tab active" onclick="switchSearchTab(this,'url')">URL</button>
-            <button class="search-tab" onclick="switchSearchTab(this,'bv')">BV号</button>
-            <button class="search-tab" onclick="switchSearchTab(this,'av')">AV号</button>
-            <button class="search-tab" onclick="switchSearchTab(this,'keyword')">关键词</button>
+            <p style="font-size:14px;color:var(--text-secondary-dark);">输入视频URL链接查找视频</p>
           </div>
           <div class="search-input-row">
-            <input type="text" id="searchInput" placeholder="请输入搜索内容...">
+            <input type="text" id="searchInput" placeholder="请输入视频url">
             <button class="btn-primary" style="width:auto;padding:10px 24px;font-size:14px;" onclick="searchVideos()">搜索</button>
           </div>
           <table class="video-result-table" id="videoResults">
             <thead>
               <tr>
-                <th>封面</th>
                 <th>标题</th>
                 <th>UP主</th>
                 <th>评论数</th>
@@ -175,7 +168,7 @@
               </tr>
             </thead>
             <tbody id="videoResultsBody">
-              <tr><td colspan="5" style="text-align:center;padding:40px 20px;color:var(--text-secondary-dark);">请输入搜索内容后点击搜索</td></tr>
+              <tr><td colspan="4" style="text-align:center;padding:40px 20px;color:var(--text-secondary-dark);">请输入视频url后点击搜索</td></tr>
             </tbody>
           </table>
           <div class="wizard-nav">
@@ -325,9 +318,8 @@
 <script>
 let wizardStep = 1;
 let selectedPlatform = 'bilibili';
-let selectedVideo = null;       // { title, bvid, avid, url, uploader, comment_count, cover_url }
+let selectedVideo = null;       // { title }
 let selectedMode = 'tracking';
-let searchType = 'url';
 
 // ──────────────────────────────────────────────
 // Platform / Mode / Param 选择
@@ -359,38 +351,27 @@ function selectParam(btn, groupId) {
 // Step 2: 视频搜索
 // ──────────────────────────────────────────────
 
-/** 切换搜索标签（URL/BV号/AV号/关键词） */
-function switchSearchTab(btn, type) {
-  document.querySelectorAll('#content-wizard .search-tab').forEach(t => t.classList.remove('active'));
-  btn.classList.add('active');
-  searchType = type;
-}
-
 /** 执行视频搜索并渲染结果表格 */
 async function searchVideos() {
   const query = document.getElementById('searchInput').value.trim();
   if (!query) {
-    alert('请输入搜索内容');
+    alert('请输入视频url');
     return;
   }
 
   const tbody = document.getElementById('videoResultsBody');
-  tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:40px 20px;color:var(--text-secondary-dark);">搜索中...</td></tr>';
+  tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;padding:40px 20px;color:var(--text-secondary-dark);">搜索中...</td></tr>';
 
   try {
-    const videos = await api.searchVideos(selectedPlatform, searchType, query);
+    const videos = await api.searchVideos(selectedPlatform, 'url', query);
     if (!videos || videos.length === 0) {
-      tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:40px 20px;color:var(--text-secondary-dark);">未找到视频</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;padding:40px 20px;color:var(--text-secondary-dark);">未找到视频</td></tr>';
       return;
     }
 
     let html = '';
     videos.forEach(function(v) {
-      const coverHtml = v.cover_url
-        ? '<img src="' + escapeHtml(v.cover_url) + '" alt="" class="video-cover" style="width:80px;height:45px;object-fit:cover;border-radius:4px;">'
-        : '<div class="video-cover" style="display:flex;align-items:center;justify-content:center;font-size:12px;color:var(--text-secondary);">封面</div>';
       html += '<tr>' +
-        '<td>' + coverHtml + '</td>' +
         '<td>' + escapeHtml(v.title || '—') + '</td>' +
         '<td>' + escapeHtml(v.uploader || '—') + '</td>' +
         '<td>' + (v.comment_count != null ? v.comment_count.toLocaleString() : '—') + '</td>' +
@@ -399,7 +380,7 @@ async function searchVideos() {
     });
     tbody.innerHTML = html;
   } catch (e) {
-    tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:40px 20px;color:#e53e3e;">搜索失败：' + escapeHtml(e.message) + '</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;padding:40px 20px;color:#e53e3e;">搜索失败：' + escapeHtml(e.message) + '</td></tr>';
   }
 }
 
