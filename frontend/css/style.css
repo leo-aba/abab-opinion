@@ -173,7 +173,7 @@ input, select, textarea { font-family: inherit; }
 .logout-btn svg { width: 16px; height: 16px; }
 
 /* Main Content Area */
-.main-content { margin-left: var(--sidebar-w); min-height: 100vh; display: flex; flex-direction: column; }
+.main-content { margin-left: var(--sidebar-w); width: calc(100% - var(--sidebar-w)); min-height: 100vh; display: flex; flex-direction: column; }
 
 /* Header */
 .top-header { position: sticky; top: 0; z-index: 50; background: var(--cream); padding: 20px 32px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #E0D9CC; }
@@ -220,7 +220,7 @@ input, select, textarea { font-family: inherit; }
 /* ============================================================
    COMPONENTS — Wizard
    ============================================================ */
-.wizard-container { max-width: 1000px; margin: 0 auto; }
+.wizard-container { width: 100%; }
 .step-indicator { display: flex; align-items: center; justify-content: center; gap: 0; margin-bottom: 40px; }
 .step-circle {
   width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center;
@@ -255,7 +255,7 @@ input, select, textarea { font-family: inherit; }
 .search-tabs { display: flex; gap: 4px; margin-bottom: 20px; background: var(--text-dark); border-radius: var(--radius-sm); padding: 4px; }
 .search-tab { padding: 8px 16px; border-radius: 6px; font-size: 13px; font-weight: 500; color: var(--text-secondary); background: none; border: none; cursor: pointer; transition: all var(--transition); }
 .search-tab.active { background: var(--black); color: var(--cream); }
-.search-input-row { display: flex; gap: 12px; margin-bottom: 20px; }
+.search-input-row { display: flex; gap: 12px; }
 .search-input-row input { flex: 1; padding: 10px 14px; border: 2px solid var(--text-dark); border-radius: var(--radius-sm); font-size: 14px; background: var(--cream); transition: all var(--transition); }
 .search-input-row input:focus { border-color: var(--orange); }
 
@@ -307,8 +307,7 @@ input, select, textarea { font-family: inherit; }
 .mode-card .mode-feature::before { content: '•'; color: var(--orange); font-weight: bold; }
 
 /* Wizard summary */
-.wizard-summary { background: var(--black); border: 1px solid #333; border-radius: var(--radius); padding: 24px; margin-bottom: 28px; color: var(--cream); }
-.wizard-summary h4 { font-size: 15px; font-weight: 600; margin-bottom: 12px; color: var(--cream); }
+.wizard-summary { background: var(--black); border: 1px solid #333; border-radius: var(--radius); padding: 24px; color: var(--cream); }
 .summary-row { display: flex; padding: 8px 0; border-bottom: 1px solid #333; font-size: 14px; }
 .summary-row:last-child { border-bottom: none; }
 .summary-row .label { color: var(--text-secondary); width: 120px; flex-shrink: 0; }

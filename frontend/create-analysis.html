@@ -119,12 +119,17 @@
             <h3 style="font-size:20px;font-weight:700;color:var(--text-dark);margin-bottom:8px;">搜索视频</h3>
             <p style="font-size:14px;color:var(--text-secondary-dark);">输入B站或抖音视频URL链接查找视频</p>
           </div>
-          <div class="search-input-row">
-            <input type="text" id="searchInput" placeholder="请输入视频url">
-            <button class="btn-primary" style="width:auto;padding:10px 24px;font-size:14px;" onclick="searchVideos()">搜索</button>
+          <div class="param-group">
+            <h4>视频链接</h4>
+            <div class="search-input-row">
+              <input type="text" id="searchInput" placeholder="请输入视频url">
+              <button class="btn-primary" style="width:auto;padding:10px 24px;font-size:14px;" onclick="searchVideos()">搜索</button>
+            </div>
+            <p style="margin-top:8px;font-size:12px;color:var(--text-secondary);">目前仅支持 <strong>Bilibili</strong>（bilibili.com）和 <strong>抖音</strong>（douyin.com）平台</p>
           </div>
-          <p style="margin-top:8px;font-size:12px;color:var(--text-secondary);">目前仅支持 <strong>Bilibili</strong>（bilibili.com）和 <strong>抖音</strong>（douyin.com）平台</p>
-          <table class="video-result-table" id="videoResults">
+          <div class="param-group">
+            <h4>搜索结果</h4>
+            <table class="video-result-table" id="videoResults">
             <thead>
               <tr>
                 <th style="width:90px;">封面</th>
@@ -138,6 +143,7 @@
               <tr><td colspan="5" style="text-align:center;padding:40px 20px;color:var(--text-secondary-dark);">请输入视频url后点击搜索</td></tr>
             </tbody>
           </table>
+          </div>
           <div class="wizard-nav">
             <div></div>
             <button class="btn-primary" style="width:auto;padding:10px 28px;font-size:14px;" onclick="wizardNext(2)">下一步 →</button>
@@ -213,28 +219,30 @@
             <p style="font-size:14px;color:var(--text-secondary-dark);">检查您的分析配置</p>
           </div>
 
-          <div class="wizard-summary">
+          <div class="param-group">
             <h4>分析配置摘要</h4>
-            <div class="summary-row">
-              <span class="label">视频</span>
-              <span class="value" id="summaryVideo">—</span>
-            </div>
-            <div class="summary-row">
-              <span class="label">评论范围</span>
-              <span class="value" id="summaryRange">按评论数量：500</span>
-            </div>
-            <div class="summary-row">
-              <span class="label">分析模式</span>
-              <span class="value" id="summaryMode">实时追踪</span>
+            <div class="wizard-summary">
+              <div class="summary-row">
+                <span class="label">视频</span>
+                <span class="value" id="summaryVideo">—</span>
+              </div>
+              <div class="summary-row">
+                <span class="label">评论范围</span>
+                <span class="value" id="summaryRange">按评论数量：500</span>
+              </div>
+              <div class="summary-row">
+                <span class="label">分析模式</span>
+                <span class="value" id="summaryMode">实时追踪</span>
+              </div>
             </div>
           </div>
 
-          <div id="trackingWarning" style="display:flex;align-items:center;gap:10px;padding:14px 20px;border-radius:var(--radius-sm);border:1px solid var(--orange);background:var(--orange-light);margin-bottom:24px;color:var(--text-dark);font-size:13px;font-weight:500;">
+          <div class="param-group" id="trackingWarning" style="display:flex;align-items:center;gap:10px;padding:14px 20px;border-radius:var(--radius-sm);border:1px solid var(--orange);background:var(--orange-light);color:var(--text-dark);font-size:13px;font-weight:500;">
             <svg viewBox="0 0 24 24" fill="none" stroke="var(--orange)" stroke-width="2" width="18" height="18" style="flex-shrink:0;"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
             实时追踪模式将消耗系统积分。当前可用积分：<strong id="credits-available">—</strong>，预计本次分析消耗 <strong id="credits-estimated">—</strong> 积分。
           </div>
 
-          <div style="text-align:center;">
+          <div class="param-group" style="text-align:center;">
             <button class="btn-lg" onclick="startAnalysis()">开始分析</button>
           </div>
 
