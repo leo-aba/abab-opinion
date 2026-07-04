@@ -220,7 +220,7 @@ input, select, textarea { font-family: inherit; }
 /* ============================================================
    COMPONENTS — Wizard
    ============================================================ */
-.wizard-container { max-width: 800px; margin: 0 auto; }
+.wizard-container { max-width: 1000px; margin: 0 auto; }
 .step-indicator { display: flex; align-items: center; justify-content: center; gap: 0; margin-bottom: 40px; }
 .step-circle {
   width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center;
@@ -266,6 +266,7 @@ input, select, textarea { font-family: inherit; }
 .video-result-table tr:last-child td { border-bottom: none; }
 .video-result-table tr:hover td { background: var(--hover); }
 .video-cover { width: 80px; height: 50px; border-radius: 4px; background: var(--hover); object-fit: cover; }
+.td-title { max-width: 320px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .btn-sm { padding: 6px 14px; border-radius: 6px; font-size: 12px; font-weight: 600; background: var(--black); color: var(--cream); border: 1px solid var(--orange); transition: all var(--transition); cursor: pointer; }
 .btn-sm:hover { background: var(--orange); }
 .btn-sm.selected-btn { background: var(--cyan); border-color: var(--cyan); color: var(--black); }
