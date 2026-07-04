@@ -111,9 +111,11 @@ async def health():
 # ---------- 路由（API 在前，静态文件在后，避免路由冲突） ----------
 from backend.api.auth import router as auth_router
 from backend.api.user import router as user_router
+from backend.api.videos import router as videos_router
 
 app.include_router(auth_router)
 app.include_router(user_router)
+app.include_router(videos_router)
 
 
 # ---------- 托管前端静态文件 ----------
