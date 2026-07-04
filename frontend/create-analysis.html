@@ -151,32 +151,14 @@
             <p style="font-size:14px;color:var(--text-secondary-dark);">自定义分析范围以获得精准洞察</p>
           </div>
 
-          <div class="param-group" id="paramCount">
-            <h4>评论数量</h4>
-            <div class="param-options">
-              <button class="param-option" onclick="selectParam(this,'paramCount')">100</button>
-              <button class="param-option selected" onclick="selectParam(this,'paramCount')">500</button>
-              <button class="param-option" onclick="selectParam(this,'paramCount')">1,000</button>
-              <button class="param-option" onclick="selectParam(this,'paramCount')">5,000</button>
-              <button class="param-option" onclick="selectParam(this,'paramCount')">全部</button>
+          <div class="param-group" id="paramRange">
+            <h4>评论范围</h4>
+            <div class="segment-control">
+              <button class="segment-btn selected" onclick="switchFilterMode('count')">按评论数量</button>
+              <button class="segment-btn" onclick="switchFilterMode('time')">按时间范围</button>
             </div>
-          </div>
-
-          <div class="param-group" id="paramTime">
-            <h4>时间范围</h4>
-            <div class="param-options">
-              <button class="param-option selected" onclick="selectParam(this,'paramTime')">最近7天</button>
-              <button class="param-option" onclick="selectParam(this,'paramTime')">最近30天</button>
-              <button class="param-option" onclick="selectParam(this,'paramTime')">全部</button>
-            </div>
-          </div>
-
-          <div class="param-group" id="paramLang">
-            <h4>语言</h4>
-            <div class="param-options">
-              <button class="param-option selected" onclick="selectParam(this,'paramLang')">中文</button>
-              <button class="param-option" onclick="selectParam(this,'paramLang')">英文</button>
-              <button class="param-option" onclick="selectParam(this,'paramLang')">全部</button>
+            <div class="param-options" id="rangeOptions" style="margin-top:12px;">
+              <!-- JS 动态填充 -->
             </div>
           </div>
 
@@ -238,16 +220,8 @@
               <span class="value" id="summaryVideo">—</span>
             </div>
             <div class="summary-row">
-              <span class="label">评论数量</span>
-              <span class="value" id="summaryCount">500</span>
-            </div>
-            <div class="summary-row">
-              <span class="label">时间范围</span>
-              <span class="value" id="summaryTime">最近7天</span>
-            </div>
-            <div class="summary-row">
-              <span class="label">语言</span>
-              <span class="value" id="summaryLang">中文</span>
+              <span class="label">评论范围</span>
+              <span class="value" id="summaryRange">按评论数量：500</span>
             </div>
             <div class="summary-row">
               <span class="label">分析模式</span>
@@ -282,6 +256,9 @@
 let wizardStep = 1;
 let selectedVideo = null;       // { title, comment_count }
 let selectedMode = 'tracking';
+let currentFilterMode = 'count';  // 'count' | 'time'
+let selectedCount = '最近500条';     // 评论数量选中值
+let selectedTime = '最近7天';      // 时间范围选中值
 
 // ──────────────────────────────────────────────
 // Mode / Param 选择
@@ -295,10 +272,52 @@ function selectMode(mode) {
   document.getElementById(mode === 'tracking' ? 'modeTracking' : 'modeNormal').classList.add('selected');
 }
 
-/** 选中参数选项（评论数量/时间范围/语言） */
+/** 选中参数选项（评论数量/时间范围） */
 function selectParam(btn, groupId) {
   document.querySelectorAll('#' + groupId + ' .param-option').forEach(b => b.classList.remove('selected'));
   btn.classList.add('selected');
+}
+
+/** 切换评论范围模式：按评论数量 / 按时间范围 */
+function switchFilterMode(mode) {
+  currentFilterMode = mode;
+  // 更新分段按钮样式
+  document.querySelectorAll('.segment-btn').forEach(function(b) {
+    b.classList.remove('selected');
+  });
+  document.querySelectorAll('.segment-btn')[mode === 'count' ? 0 : 1].classList.add('selected');
+  // 重新渲染选项
+  renderRangeOptions();
+}
+
+/** 根据当前分段模式渲染对应的参数选项 */
+function renderRangeOptions() {
+  var container = document.getElementById('rangeOptions');
+  if (!container) return;
+  var options, current;
+  if (currentFilterMode === 'count') {
+    options = ['最近100条', '最近200条', '最近500条', '全部'];
+    current = selectedCount;
+  } else {
+    options = ['最近7天', '最近30天', '全部'];
+    current = selectedTime;
+  }
+  var html = '';
+  for (var i = 0; i < options.length; i++) {
+    var sel = (options[i] === current) ? ' selected' : '';
+    html += '<button class="param-option' + sel + '" onclick="selectRangeOption(this,\'' + options[i] + '\')">' + options[i] + '</button>';
+  }
+  container.innerHTML = html;
+}
+
+/** 选中范围选项并更新全局状态 */
+function selectRangeOption(btn, value) {
+  selectParam(btn, 'rangeOptions');
+  if (currentFilterMode === 'count') {
+    selectedCount = value;
+  } else {
+    selectedTime = value;
+  }
 }
 
 // ──────────────────────────────────────────────
@@ -420,9 +439,10 @@ function getSelectedParam(groupId) {
 /** 用当前选择填充确认页摘要 */
 function updateWizardSummary() {
   setText('summaryVideo', selectedVideo ? selectedVideo.title : '—');
-  setText('summaryCount', getSelectedParam('paramCount'));
-  setText('summaryTime', getSelectedParam('paramTime'));
-  setText('summaryLang', getSelectedParam('paramLang'));
+  var rangeText = currentFilterMode === 'count'
+    ? '按评论数量：' + selectedCount
+    : '按时间范围：' + selectedTime;
+  setText('summaryRange', rangeText);
   setText('summaryMode', selectedMode === 'tracking' ? '实时追踪' : '普通分析');
 
   var warning = document.getElementById('trackingWarning');
@@ -435,8 +455,8 @@ function updateWizardSummary() {
 
 /** 查询并显示当前可用积分和预估消耗 */
 async function loadCredits() {
-  var countText = getSelectedParam('paramCount');
-  var commentCount = countText === '全部' ? 0 : parseInt(countText.replace(/,/g, '')) || 500;
+  var countText = currentFilterMode === 'count' ? selectedCount : '全部';
+  var commentCount = countText === '全部' ? 0 : (parseInt(countText.match(/\d+/)?.[0]) || 500);
 
   setText('credits-available', '加载中...');
   setText('credits-estimated', '加载中...');
@@ -457,16 +477,17 @@ async function loadCredits() {
 
 /** 提交分析任务 → 保存元数据到 sessionStorage → 跳转 Pipeline 页 */
 async function startAnalysis() {
-  var countText = getSelectedParam('paramCount');
-  var commentCount = countText === '全部' ? 0 : parseInt(countText.replace(/,/g, '')) || 500;
+  var countText = currentFilterMode === 'count' ? selectedCount : '全部';
+  var commentCount = countText === '全部' ? 0 : (parseInt(countText.match(/\d+/)?.[0]) || 500);
+  var timeRange = currentFilterMode === 'time' ? selectedTime : '全部';
 
   var params = {
     mode: selectedMode,
     video_title: selectedVideo ? selectedVideo.title : '',
     video_url: document.getElementById('searchInput').value.trim(),
     comment_count: commentCount,
-    time_range: getSelectedParam('paramTime'),
-    language: getSelectedParam('paramLang')
+    time_range: timeRange,
+    language: 'all'
   };
 
   try {
@@ -500,6 +521,7 @@ function escapeAttr(str) {
 
 (function() {
   selectMode('tracking');
+  renderRangeOptions();
   initPage({ loadUser: true, loadHeaderStats: true });
 })();
 </script>
