@@ -129,6 +129,8 @@ def _build_steps(status: str, progress_pct: int) -> list[dict]:
         done_count = 0 if progress_pct < 10 else 1
     elif status == "collecting":
         done_count = 0
+    elif status == "cleaning":
+        done_count = 1  # 抓取已完成，正在清洗
     else:
         done_count = 0
 
@@ -136,7 +138,10 @@ def _build_steps(status: str, progress_pct: int) -> list[dict]:
     for step_num, step_name in step_defs:
         if step_num <= done_count:
             state = "done"
-        elif step_num == done_count + 1 and (status == "collecting" or status == "completed" or (status == "failed" and step_num == 1)):
+        elif step_num == done_count + 1 and (
+            status in ("collecting", "cleaning", "completed")
+            or (status == "failed" and step_num == 1)
+        ):
             state = "running" if status != "failed" else "done"
         else:
             state = "waiting"
@@ -159,6 +164,8 @@ def _build_hint(status: str, progress_pct: int, processed: int, limit: int) -> s
             return f"正在抓取评论 ({processed}/{limit})..."
         else:
             return f"正在抓取评论 (已处理 {processed} 条)..."
+    elif status == "cleaning":
+        return "正在清洗评论数据..."
     elif status == "completed":
         return "分析完成！"
     elif status == "failed":
@@ -175,12 +182,23 @@ def _build_logs(status: str, task: AnalysisTask) -> list[dict]:
 
     logs.append({"time": task.created_at.strftime("%H:%M:%S") if task.created_at else now, "message": "任务已创建", "type": "info"})
 
-    if status == "collecting" or status == "completed":
+    if status in ("collecting", "cleaning", "completed"):
         logs.append({"time": now, "message": f"开始抓取评论...", "type": "info"})
         if task.total_comments_processed > 0:
             logs.append({"time": now, "message": f"已完成抓取，共 {task.total_comments_processed} 条", "type": "success"})
 
+    if status == "cleaning":
+        logs.append({"time": now, "message": "正在清洗评论数据...", "type": "info"})
+
     if status == "completed":
+        # 如果 error_message 中包含清洗统计，则附加展示
+        if task.error_message:
+            try:
+                import json
+                clean_stats = json.loads(task.error_message)
+                logs.append({"time": now, "message": f"清洗完成: 原始 {clean_stats['total']} 条, 保留 {clean_stats['kept']} 条, 去除 {clean_stats['removed']} 条 (空={clean_stats['removed_empty']}, 表情={clean_stats['removed_emoji']}, 无意义={clean_stats['removed_meaningless']})", "type": "success"})
+            except (json.JSONDecodeError, KeyError):
+                pass
         logs.append({"time": now, "message": "分析任务全部完成", "type": "success"})
 
     if status == "failed" and task.error_message:
@@ -193,42 +211,15 @@ def _build_logs(status: str, task: AnalysisTask) -> list[dict]:
 # SSE 实时进度推送
 # ──────────────────────────────────────────────
 
-async def _get_current_user_sse(
-    request: Request,
-    db: AsyncSession = Depends(get_db),
-):
-    """SSE 端点专用鉴权：优先取 query param ?token=，其次取 Authorization header。
 
-    EventSource 无法自定义请求头，因此 token 通过 query 传递。
+def _sse_error(msg: str) -> StreamingResponse:
+    """返回一个立即发送 error 事件后关闭的 SSE 响应。
+
+    避免直接返回 HTTP 错误码（EventSource 无法读取非 200 的响应体）。
     """
-    token = request.query_params.get("token")
-    if not token:
-        # fallback: 尝试从 Authorization header 读取
-        auth = request.headers.get("authorization", "")
-        if auth.startswith("Bearer "):
-            token = auth[7:]
-
-    if not token:
-        raise HTTPException(status_code=401, detail="未登录")
-
-    from jose import jwt, JWTError
-    from backend.config import JWT_SECRET, JWT_ALGORITHM
-    from backend.models.user import User
-
-    try:
-        payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
-        user_id: str = payload.get("sub")
-        if not user_id:
-            raise HTTPException(status_code=401, detail="无效的 Token")
-    except JWTError:
-        raise HTTPException(status_code=401, detail="Token 已过期或无效")
-
-    from sqlalchemy import select
-    result = await db.execute(select(User).where(User.id == user_id))
-    user = result.scalar_one_or_none()
-    if not user:
-        raise HTTPException(status_code=401, detail="用户不存在")
-    return user
+    async def gen():
+        yield f"event: error\ndata: {json.dumps({'message': msg})}\n\n"
+    return StreamingResponse(gen(), media_type="text/event-stream")
 
 
 @router.get("/{task_id}/stream", summary="SSE 实时进度推送")
@@ -236,7 +227,6 @@ async def stream_analysis_progress(
     task_id: str,
     request: Request,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(_get_current_user_sse),
 ):
     """SSE (Server-Sent Events) 端点，供 pipeline.html 实时展示分析进度。
 
@@ -250,14 +240,45 @@ async def stream_analysis_progress(
       - error:    {message}
 
     每 2 秒轮询一次任务状态，连接断开时自动退出。
+
+    注意：所有鉴权/权限错误都通过 SSE error 事件而非 HTTP 状态码返回，
+    因为 EventSource 无法读取非 200 的响应体。
     """
-    # 验证任务所有权
+    # ── 1) 鉴权：从 query param 获取 token（EventSource 无法设自定义请求头）──
+    token = request.query_params.get("token")
+    if not token:
+        auth = request.headers.get("authorization", "")
+        if auth.startswith("Bearer "):
+            token = auth[7:]
+
+    if not token:
+        return _sse_error("未登录")
+
+    try:
+        from jose import jwt, JWTError
+        from backend.config import JWT_SECRET, JWT_ALGORITHM
+        payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
+        user_id: str = payload.get("sub")
+        if not user_id:
+            return _sse_error("无效的 Token")
+    except JWTError:
+        return _sse_error("Token 已过期或无效")
+
+    from sqlalchemy import select
+    from backend.models.user import User
+    result = await db.execute(select(User).where(User.id == user_id))
+    current_user = result.scalar_one_or_none()
+    if not current_user:
+        return _sse_error("用户不存在")
+
+    # ── 2) 验证任务存在性和所有权 ──
     task = await db.get(AnalysisTask, task_id)
     if not task:
-        raise HTTPException(status_code=404, detail="任务不存在")
+        return _sse_error("任务不存在")
     if task.user_id != current_user.id:
-        raise HTTPException(status_code=403, detail="无权访问")
+        return _sse_error("无权访问")
 
+    # ── 3) SSE 事件流 ──
     async def event_stream():
         last_log_count = 0
         last_status = None

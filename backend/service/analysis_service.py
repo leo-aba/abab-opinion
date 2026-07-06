@@ -1,8 +1,10 @@
 """分析任务 Service — 创建、查询分析任务"""
 
 import json
+import os
 import uuid
 import logging
+from pathlib import Path
 from fastapi import BackgroundTasks
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -15,7 +17,8 @@ from backend.service.video_service import (
     parse_video_url, find_video_by_platform_id, upsert_video,
     fetch_bilibili_video_info, fetch_bilibili_comments,
 )
-from backend.service.comment_service import batch_upsert_comments
+from backend.service.comment_service import batch_upsert_comments, delete_comments_by_video
+from backend.service.comment_cleaner import clean_comments
 
 logger = logging.getLogger("analysis_service")
 
@@ -45,9 +48,20 @@ async def run_crawl_task(
 ) -> None:
     """后台爬取任务：在独立 DB session 中执行，更新任务状态。
 
-    状态流转: queued → collecting → completed / failed
+    流程:
+    1. 爬取评论 → 保存到本地 JSON
+    2. 清洗评论（过滤无意义内容）
+    3. 删除本地临时文件
+    4. 删除该视频旧评论（DB）
+    5. 清洗后的评论写入 DB
+
+    状态流转: queued → collecting → cleaning → completed / failed
     """
     logger.info("后台爬取任务启动: task_id=%s, video_id=%s", task_id, video_id)
+
+    # 本地临时文件目录
+    _DATA_DIR = Path(__file__).resolve().parent.parent.parent / "data"
+    _DATA_DIR.mkdir(parents=True, exist_ok=True)
 
     async def _update_status(db: AsyncSession | None, status: AnalysisStatus, **kwargs):
         """更新任务状态，若 db 为 None 则创建新 session。"""
@@ -70,6 +84,8 @@ async def run_crawl_task(
                 for k, v in kwargs.items():
                     setattr(task, k, v)
                 await sess.commit()
+
+    raw_file_path = None
 
     try:
         if platform != "bilibili":
@@ -96,9 +112,8 @@ async def run_crawl_task(
         crawl_db = await get_sessionmaker()().__aenter__()
         try:
             async def _crawl_progress(current: int, target: int):
-                """每页抓取后的进度回调"""
+                """每页抓取后的进度回调，10% → 80% 映射到爬取阶段"""
                 if target > 0:
-                    # progress_pct: 10% → 80% 映射到爬取阶段
                     pct = 10 + int((current / target) * 70)
                     pct = min(max(pct, 10), 80)
                 else:
@@ -118,24 +133,61 @@ async def run_crawl_task(
 
         logger.info("B站评论爬取完成: aid=%s, 共 %s 条", aid, len(raw_comments))
 
-        # ── 4) 批量写入 DB ──
+        # ── 4) 保存原始评论到本地 JSON ──
+        raw_file_path = _DATA_DIR / f"raw_comments_{task_id}.json"
+        with open(raw_file_path, "w", encoding="utf-8") as f:
+            json.dump(raw_comments, f, ensure_ascii=False, default=str)
+        logger.info("原始评论已保存到本地: %s (%d 条)", raw_file_path, len(raw_comments))
+
+        # ── 5) 状态 → cleaning，清洗评论 ──
         async with get_sessionmaker()() as db:
+            await _update_status(db, AnalysisStatus.cleaning, progress_pct=85)
+
+        cleaned_comments, clean_stats = clean_comments(raw_comments)
+        logger.info(
+            "评论清洗完成: 原始=%d, 保留=%d, 去除=%d",
+            clean_stats["total"], clean_stats["kept"], clean_stats["removed"],
+        )
+
+        # ── 6) 删除本地临时文件 ──
+        if raw_file_path and raw_file_path.exists():
+            raw_file_path.unlink()
+            logger.info("本地临时文件已删除: %s", raw_file_path)
+            raw_file_path = None
+
+        # ── 7) 删除该视频旧评论 + 写入清洗后评论 ──
+        async with get_sessionmaker()() as db:
+            # 7a) 删除旧评论
+            deleted_count = await delete_comments_by_video(db, video_id)
+            logger.info("已删除视频 %s 的旧评论 %d 条", video_id, deleted_count)
+
+            # 7b) 写入清洗后的评论
             inserted = await batch_upsert_comments(
-                db, video_id, "bilibili", raw_comments, task_id
+                db, video_id, "bilibili", cleaned_comments, task_id,
             )
+
+            # 7c) 完成 → 更新状态（包含清洗统计）
             await _update_status(
                 db, AnalysisStatus.completed,
                 progress_pct=100,
                 total_comments_processed=inserted,
+                error_message=json.dumps(clean_stats, ensure_ascii=False),
             )
 
         logger.info(
-            "后台爬取任务完成: task_id=%s, 新增评论=%d",
-            task_id, inserted,
+            "后台爬取任务完成: task_id=%s, 清洗后评论=%d (原始=%d)",
+            task_id, inserted, len(raw_comments),
         )
 
     except Exception as e:
         logger.error("后台爬取任务失败: task_id=%s, error=%s", task_id, e)
+        # 清理本地临时文件
+        if raw_file_path and raw_file_path.exists():
+            try:
+                raw_file_path.unlink()
+                logger.info("异常时清理本地临时文件: %s", raw_file_path)
+            except OSError:
+                pass
         try:
             async with get_sessionmaker()() as db:
                 await _update_status(
@@ -213,6 +265,9 @@ async def create_analysis_task(
             platform_video_id=platform_video_id,
             comment_limit=comment_count,
         )
+
+    # 提前提交事务，确保后台任务能在独立 session 中查到该记录
+    await db.commit()
 
     logger.info(
         "分析任务已创建: task_id=%s user=%s video=%s platform=%s mode=%s",

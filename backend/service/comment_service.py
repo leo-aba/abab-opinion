@@ -1,7 +1,8 @@
 """评论数据操作 Service — 批量写入、查询"""
 
+import uuid
 import logging
-from sqlalchemy import select
+from sqlalchemy import select, delete
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.models.comment import Comment
@@ -51,6 +52,7 @@ async def batch_upsert_comments(
         user_info = c.get("user", {})
         new_comments.append(
             Comment(
+                id=str(uuid.uuid4()),
                 cid=c["cid"],
                 video_id=video_id,
                 task_id=task_id,
@@ -77,3 +79,21 @@ async def batch_upsert_comments(
         video_id, platform, len(new_comments), len(comments) - len(new_comments),
     )
     return len(new_comments)
+
+
+async def delete_comments_by_video(db: AsyncSession, video_id: str) -> int:
+    """删除指定视频的所有评论。
+
+    Args:
+        db: 数据库 session
+        video_id: 视频 UUID
+
+    Returns:
+        int: 删除的评论条数
+    """
+    result = await db.execute(
+        delete(Comment).where(Comment.video_id == video_id)
+    )
+    await db.flush()
+    logger.info("已删除视频 %s 的 %d 条评论", video_id, result.rowcount)
+    return result.rowcount

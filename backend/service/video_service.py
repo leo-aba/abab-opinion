@@ -30,8 +30,9 @@ BILIBILI_HEADERS = {
 # B站 BV 号正则：BV + 10位字母数字
 _BV_PATTERN = re.compile(r"BV[0-9A-Za-z]{10}")
 
-# 抖音视频 ID 正则：/video/ 后跟纯数字
+# 抖音视频 ID 正则：/video/ 后跟纯数字，或 /jingxuan 的 modal_id 参数
 _DOUYIN_PATTERN = re.compile(r"douyin\.com/video/(\d+)")
+_DOUYIN_MODAL_PATTERN = re.compile(r"douyin\.com/jingxuan.*[?&]modal_id=(\d+)")
 
 
 # ──────────────────────────────────────────────
@@ -55,8 +56,10 @@ def parse_video_url(url: str) -> tuple[str, str]:
     if bv_match:
         return Platform.bilibili.value, bv_match.group(0)
 
-    # 2) 尝试匹配抖音视频 ID
+    # 2) 尝试匹配抖音视频 ID（/video/ 或 /jingxuan?modal_id=）
     douyin_match = _DOUYIN_PATTERN.search(url)
+    if not douyin_match:
+        douyin_match = _DOUYIN_MODAL_PATTERN.search(url)
     if douyin_match:
         return Platform.douyin.value, douyin_match.group(1)
 
@@ -182,7 +185,7 @@ def _extract_bilibili_comment_info(c: dict) -> dict:
     return {
         "cid": str(c.get("rpid", "")),
         "text": c.get("content", {}).get("message", ""),
-        "create_time": ctime,
+        "create_time": datetime.fromtimestamp(ctime) if ctime else None,
         "digg_count": c.get("like", 0),
         "reply_comment_total": c.get("rcount", 0),
         "user": {
