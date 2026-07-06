@@ -108,6 +108,69 @@ async def health():
     return {"status": "ok"}
 
 
+@app.get("/debug/routes")
+async def debug_routes():
+    """调试: 查看所有注册的路由"""
+    from fastapi.routing import _IncludedRouter
+    from starlette.routing import Mount
+    info = []
+    for i, route in enumerate(app.router.routes):
+        rtype = type(route).__name__
+        entry = {"index": i, "type": rtype}
+        if hasattr(route, 'path'):
+            entry["path"] = route.path
+        if hasattr(route, 'name'):
+            entry["name"] = route.name
+        if hasattr(route, 'methods'):
+            entry["methods"] = sorted(route.methods) if route.methods else []
+        if isinstance(route, _IncludedRouter):
+            sub = []
+            for sr in route.original_router.routes:
+                sub.append({"path": sr.path, "methods": sorted(sr.methods) if hasattr(sr, 'methods') and sr.methods else []})
+            entry["sub_routes"] = sub
+        info.append(entry)
+    return {"routes": info}
+
+
+@app.get("/debug/ping")
+async def debug_ping(path: str = ""):
+    """调试: 测试特定路径的路由匹配"""
+    from starlette.routing import Match, get_route_path
+    from fastapi.routing import _IncludedRouter
+    from starlette.datastructures import URL
+    # Create a mock scope
+    scope = {
+        "type": "http",
+        "path": path or "/api/videos/search?query=BV1",
+        "method": "GET",
+        "scheme": "http",
+        "server": ("localhost", 8000),
+        "headers": [],
+        "query_string": b"",
+        "root_path": "",
+        "path_params": {},
+        "app": app,
+    }
+    results = []
+    for i, route in enumerate(app.router.routes):
+        try:
+            match, child_scope = route.matches(scope)
+            results.append({
+                "index": i,
+                "type": type(route).__name__,
+                "path": getattr(route, 'path', ''),
+                "match": str(match),
+            })
+        except Exception as e:
+            results.append({
+                "index": i,
+                "type": type(route).__name__,
+                "path": getattr(route, 'path', ''),
+                "match": f"ERROR: {e}",
+            })
+    return {"results": results}
+
+
 # ---------- 路由（API 在前，静态文件在后，避免路由冲突） ----------
 from backend.api.auth import router as auth_router
 from backend.api.user import router as user_router
@@ -120,6 +183,11 @@ app.include_router(user_router)
 app.include_router(videos_router)
 app.include_router(analysis_router)
 app.include_router(settings_router)
+
+# 强制解析 _IncludedRouter 的候选路由，避免延迟解析问题
+app.openapi()
+logger.info("已注册 %d 个路由，OpenAPI 包含 %d 个路径",
+             len(app.router.routes), len(app.openapi_schema.get("paths", {})))
 
 
 # ---------- 托管前端静态文件 ----------

@@ -2,6 +2,7 @@
 搜索策略：每次都实时调用平台 API 获取最新数据，然后根据 DB 有无记录决定 INSERT 或 UPDATE。
 """
 
+import asyncio
 import re
 import uuid
 import logging
@@ -29,8 +30,9 @@ BILIBILI_HEADERS = {
 # B站 BV 号正则：BV + 10位字母数字
 _BV_PATTERN = re.compile(r"BV[0-9A-Za-z]{10}")
 
-# 抖音视频 ID 正则：/video/ 后跟纯数字
+# 抖音视频 ID 正则：/video/ 后跟纯数字，或 /jingxuan 的 modal_id 参数
 _DOUYIN_PATTERN = re.compile(r"douyin\.com/video/(\d+)")
+_DOUYIN_MODAL_PATTERN = re.compile(r"douyin\.com/jingxuan.*[?&]modal_id=(\d+)")
 
 
 # ──────────────────────────────────────────────
@@ -54,8 +56,10 @@ def parse_video_url(url: str) -> tuple[str, str]:
     if bv_match:
         return Platform.bilibili.value, bv_match.group(0)
 
-    # 2) 尝试匹配抖音视频 ID
+    # 2) 尝试匹配抖音视频 ID（/video/ 或 /jingxuan?modal_id=）
     douyin_match = _DOUYIN_PATTERN.search(url)
+    if not douyin_match:
+        douyin_match = _DOUYIN_MODAL_PATTERN.search(url)
     if douyin_match:
         return Platform.douyin.value, douyin_match.group(1)
 
@@ -126,8 +130,344 @@ async def fetch_bilibili_video_info(bvid: str) -> dict | None:
         "comment_count": stat.get("reply", 0),
         "view_count": stat.get("view"),
         "like_count": stat.get("like"),
+        "extras": {"aid": video.get("aid")},
         "analysis_status": "pending",
     }
+
+
+# ──────────────────────────────────────────────
+# B站评论爬取（异步 httpx 版）
+# ──────────────────────────────────────────────
+
+async def fetch_bilibili_comment_page(
+    aid: int, cursor: int = 0
+) -> tuple[list[dict] | None, int | None, bool]:
+    """抓取一页 B站一级评论（异步 httpx 版）。
+
+    API: https://api.bilibili.com/x/v2/reply/main
+    参数: oid=aid, type=1(视频), mode=3(热度), next=cursor
+
+    Returns:
+        (replies, next_cursor, is_end)
+        replies 为 None 表示接口异常。
+    """
+    params = {
+        "oid": aid,
+        "type": 1,
+        "mode": 3,
+        "next": cursor,
+    }
+    url = "https://api.bilibili.com/x/v2/reply/main"
+    try:
+        async with httpx.AsyncClient(timeout=15.0) as client:
+            resp = await client.get(url, headers=BILIBILI_HEADERS, params=params)
+            resp.raise_for_status()
+            data = resp.json()
+    except httpx.HTTPError as e:
+        logger.error("Bilibili 评论 API 请求失败: %s", e)
+        raise RuntimeError(f"请求 Bilibili 评论 API 失败: {e}") from e
+
+    if data.get("code") != 0:
+        msg = data.get("message", "未知错误")
+        logger.warning("Bilibili 评论 API 返回错误: code=%s, message=%s", data.get("code"), msg)
+        raise RuntimeError(f"Bilibili 评论 API 错误: {msg}")
+
+    cursor_data = data.get("data", {}).get("cursor", {})
+    replies = data.get("data", {}).get("replies")
+    next_cursor = cursor_data.get("next")
+    is_end = cursor_data.get("is_end", True)
+    return replies, next_cursor, is_end
+
+
+def _extract_bilibili_comment_info(c: dict) -> dict:
+    """提取单条 B站评论的字段，与 test/bilibili_crawler.py extract_comment_info 一致"""
+    ctime = c.get("ctime", 0)
+    return {
+        "cid": str(c.get("rpid", "")),
+        "text": c.get("content", {}).get("message", ""),
+        "create_time": datetime.fromtimestamp(ctime) if ctime else None,
+        "digg_count": c.get("like", 0),
+        "reply_comment_total": c.get("rcount", 0),
+        "user": {
+            "uid": str(c.get("member", {}).get("mid", "")),
+            "nickname": c.get("member", {}).get("uname", ""),
+            "avatar": c.get("member", {}).get("avatar", ""),
+        },
+    }
+
+
+async def fetch_bilibili_comments(
+    aid: int, max_count: int = 500,
+    progress_callback=None,
+) -> list[dict]:
+    """抓取 B站评论，直到达到 max_count 或没有更多。
+
+    Args:
+        aid: 视频 aid（从 video.extras 获取）
+        max_count: 最多抓取条数，0 表示全部抓取
+        progress_callback: 可选异步回调，每页抓取后调用
+            progress_callback(current_count, target_count)
+
+    Returns:
+        list[dict]: 评论列表，每项格式同 _extract_bilibili_comment_info
+    """
+    all_comments: list[dict] = []
+    cursor = 0
+    page = 0
+    is_end = False
+    sleep_sec = 1.2
+
+    # 估算总页数：假设每页约 20 条，用于进度估算
+    estimated_per_page = 20
+
+    while not is_end:
+        if max_count > 0 and len(all_comments) >= max_count:
+            break
+
+        page += 1
+        logger.debug("抓取评论第 %s 页 (cursor=%s)...", page, cursor)
+
+        replies, next_cursor, is_end = await fetch_bilibili_comment_page(aid, cursor)
+
+        if replies is None:
+            break
+        if not replies:
+            break
+
+        for c in replies:
+            all_comments.append(_extract_bilibili_comment_info(c))
+            if max_count > 0 and len(all_comments) >= max_count:
+                break
+
+        logger.info("评论抓取进度: 第 %s 页, 累计 %s 条", page, len(all_comments))
+
+        # 每页抓取后回调（用于前端进度展示）
+        if progress_callback:
+            target = max_count if max_count > 0 else (page * estimated_per_page * 2)
+            await progress_callback(len(all_comments), target)
+
+        cursor = next_cursor if next_cursor is not None else cursor
+
+        # 防限流休眠
+        if not is_end and (max_count == 0 or len(all_comments) < max_count):
+            await asyncio.sleep(sleep_sec)
+
+    logger.info("B站评论抓取完成: aid=%s, 共 %s 条", aid, len(all_comments))
+    return all_comments
+
+
+# ──────────────────────────────────────────────
+# 抖音 API 抓取（Selenium + JS fetch，需要已登录的浏览器 Cookie）
+# ──────────────────────────────────────────────
+
+_DOUYIN_HEADERS = {
+    "User-Agent": (
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+        "AppleWebKit/537.36 (KHTML, like Gecko) "
+        "Chrome/131.0.0.0 Safari/537.36"
+    ),
+    "Referer": "https://www.douyin.com/",
+}
+
+
+def _create_douyin_driver():
+    """创建 Selenium Chrome Driver（含反检测配置，headless 模式）"""
+    from selenium import webdriver
+    from selenium.webdriver.chrome.options import Options
+
+    options = Options()
+    options.add_argument('--headless=new')
+    options.add_argument('--disable-blink-features=AutomationControlled')
+    options.add_argument(f'--user-agent={_DOUYIN_HEADERS["User-Agent"]}')
+    options.add_experimental_option('excludeSwitches', ['enable-automation'])
+    options.add_experimental_option('useAutomationExtension', False)
+    options.add_argument('--no-sandbox')
+    options.add_argument('--disable-dev-shm-usage')
+    driver = webdriver.Chrome(options=options)
+    driver.set_script_timeout(15)
+    return driver
+
+
+def _douyin_init_session(driver) -> None:
+    """初始化抖音浏览器会话：访问首页获取 Cookie，再访问视频页"""
+    import time
+    driver.get("https://www.douyin.com/")
+    time.sleep(3)
+
+
+def _douyin_js_fetch(driver, url: str) -> dict:
+    """通过 JS fetch 从浏览器内部调用抖音 API，返回 JSON dict"""
+    import json as _json
+    js = """
+    var url = arguments[0];
+    var callback = arguments[arguments.length - 1];
+    fetch(url, {
+        credentials: "include",
+        headers: {"Accept": "application/json"}
+    }).then(function(r) { return r.json(); }).then(function(d) {
+        callback(JSON.stringify(d));
+    }).catch(function(e) {
+        callback(JSON.stringify({_error: e.message}));
+    });
+    """
+    raw = driver.execute_async_script(js, url)
+    return _json.loads(raw)
+
+
+def _extract_douyin_comment_info(c: dict) -> dict:
+    """提取单条抖音评论字段，与 B站 _extract_bilibili_comment_info 格式对齐"""
+    ctime = c.get("create_time", 0)
+    return {
+        "cid": str(c.get("cid", "")),
+        "text": c.get("text", ""),
+        "create_time": datetime.fromtimestamp(ctime) if ctime else None,
+        "digg_count": c.get("digg_count", 0),
+        "reply_comment_total": c.get("reply_comment_total", 0),
+        "user": {
+            "uid": str(c.get("user", {}).get("uid", "")),
+            "nickname": c.get("user", {}).get("nickname", ""),
+            "avatar": c.get("user", {}).get("avatar_thumb", {}).get("url_list", [""])[0]
+            if c.get("user", {}).get("avatar_thumb") else None,
+        },
+    }
+
+
+async def fetch_douyin_video_info(video_id: str) -> dict | None:
+    """通过 Selenium 获取抖音视频元信息，返回与 videos 表对齐的 dict。
+
+    使用 JS fetch 调用抖音 aweme/detail API。
+    """
+    import time
+    api_url = (
+        f"https://www.douyin.com/aweme/v1/web/aweme/detail/"
+        f"?aweme_id={video_id}&device_platform=webapp"
+    )
+    driver = _create_douyin_driver()
+    try:
+        _douyin_init_session(driver)
+
+        # 访问视频页面让浏览器建立 Referer 上下文
+        driver.get(f"https://www.douyin.com/video/{video_id}")
+        time.sleep(3)
+
+        data = await asyncio.to_thread(_douyin_js_fetch, driver, api_url)
+
+        if "_error" in data:
+            raise RuntimeError(f"抖音 API 请求失败: {data['_error']}")
+
+        aweme = data.get("aweme_detail")
+        if not aweme:
+            raise RuntimeError("抖音 API 未返回视频数据")
+
+        author = aweme.get("author", {})
+        stat = aweme.get("statistics", {})
+
+        publish_time = None
+        create_time_ts = aweme.get("create_time")
+        if create_time_ts:
+            publish_time = datetime.fromtimestamp(create_time_ts).strftime("%Y-%m-%d %H:%M:%S")
+
+        return {
+            "platform": Platform.douyin.value,
+            "platform_video_id": video_id,
+            "title": aweme.get("desc") or aweme.get("preview_title") or "",
+            "description": aweme.get("desc") or None,
+            "cover_url": (
+                aweme.get("video", {}).get("cover", {}).get("url_list", [""])[0]
+                or aweme.get("video", {}).get("origin_cover", {}).get("url_list", [""])[0]
+                or None
+            ),
+            "uploader_name": author.get("nickname") or None,
+            "uploader_id": str(author.get("uid", "")) if author.get("uid") else None,
+            "url": f"https://www.douyin.com/video/{video_id}/",
+            "publish_time": publish_time,
+            "duration_seconds": aweme.get("video", {}).get("duration"),
+            "comment_count": stat.get("comment_count", 0),
+            "view_count": stat.get("play_count"),
+            "like_count": stat.get("digg_count"),
+            "extras": {"aweme_id": video_id},
+            "analysis_status": "pending",
+        }
+    finally:
+        driver.quit()
+
+
+async def fetch_douyin_comments(
+    video_id: str,
+    max_count: int = 500,
+    progress_callback=None,
+) -> list[dict]:
+    """抓取抖音评论，直到达到 max_count 或没有更多。
+
+    通过 Selenium + JS fetch 调用抖音评论 API。
+    返回格式与 fetch_bilibili_comments 一致。
+
+    Args:
+        video_id: 抖音视频 ID（19位数字）
+        max_count: 最多抓取条数，0 表示全部抓取
+        progress_callback: 可选异步回调，每页抓取后调用
+    """
+    import time
+    import json as _json
+
+    all_comments: list[dict] = []
+    cursor = 0
+    page = 0
+    has_more = True
+    sleep_sec = 1.5
+
+    driver = _create_douyin_driver()
+    try:
+        _douyin_init_session(driver)
+
+        # 访问视频页面建立上下文
+        driver.get(f"https://www.douyin.com/video/{video_id}")
+        time.sleep(3)
+
+        while has_more:
+            if max_count > 0 and len(all_comments) >= max_count:
+                break
+
+            page += 1
+            logger.debug("抖音评论抓取第 %s 页 (cursor=%s)...", page, cursor)
+
+            api_url = (
+                f"https://www.douyin.com/aweme/v1/web/comment/list/"
+                f"?aweme_id={video_id}&cursor={cursor}&count=20&device_platform=webapp"
+            )
+            data = await asyncio.to_thread(_douyin_js_fetch, driver, api_url)
+
+            if "_error" in data:
+                logger.error("抖音评论 API 错误: %s", data["_error"])
+                break
+
+            comments = data.get("comments")
+            if not comments:
+                logger.info("抖音评论: 第 %s 页无数据，停止", page)
+                break
+
+            for c in comments:
+                all_comments.append(_extract_douyin_comment_info(c))
+                if max_count > 0 and len(all_comments) >= max_count:
+                    break
+
+            logger.info("抖音评论抓取进度: 第 %s 页, 累计 %s 条", page, len(all_comments))
+
+            if progress_callback:
+                target = max_count if max_count > 0 else page * 20 * 2
+                await progress_callback(len(all_comments), target)
+
+            has_more = data.get("has_more", False)
+            cursor = data.get("cursor", cursor)
+
+            if has_more and (max_count == 0 or len(all_comments) < max_count):
+                time.sleep(sleep_sec)
+
+    finally:
+        driver.quit()
+
+    logger.info("抖音评论抓取完成: video_id=%s, 共 %s 条", video_id, len(all_comments))
+    return all_comments
 
 
 # ──────────────────────────────────────────────
@@ -155,6 +495,7 @@ async def upsert_video(db: AsyncSession, info: dict) -> Video:
         existing.comment_count = info["comment_count"]
         existing.view_count = info["view_count"]
         existing.like_count = info["like_count"]
+        existing.extras = info.get("extras")
         # updated_at 由 SQLAlchemy onupdate 自动设置
         logger.info("已更新: platform=%s, id=%s, title=%s",
                      info["platform"], info["platform_video_id"], info["title"])
@@ -194,11 +535,7 @@ async def search_video_by_url(query: str, db: AsyncSession) -> list[dict]:
     if platform == Platform.bilibili.value:
         info = await fetch_bilibili_video_info(video_id)
     elif platform == Platform.douyin.value:
-        # 抖音 API 需要 cookie/签名鉴权，暂不实现实时抓取
-        raise RuntimeError(
-            "抖音视频搜索暂不支持实时查询。"
-            "请先在系统中录入该视频，或联系管理员。"
-        )
+        info = await fetch_douyin_video_info(video_id)
     else:
         raise RuntimeError(f"不支持的平台: {platform}")
 

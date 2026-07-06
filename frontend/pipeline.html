@@ -343,9 +343,12 @@
                     addLog(getTimeStr(), '错误: ' + errMsg, 'error');
                     document.getElementById('progressHint').textContent = '分析出错: ' + errMsg;
                     closeSSE();
+                    startPolling();
                 });
 
                 eventSource.onerror = function () {
+                    // 避免重复 fallback（addEventListener('error', ...) 可能已启动轮询）
+                    if (pollTimer) return;
                     // SSE 连接失败 → 降级到轮询模式
                     addLog(getTimeStr(), '实时数据流连接失败，切换到轮询模式', 'warn');
                     closeSSE();
