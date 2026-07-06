@@ -112,10 +112,12 @@ async def health():
 from backend.api.auth import router as auth_router
 from backend.api.user import router as user_router
 from backend.api.videos import router as videos_router
+from backend.api.analysis import router as analysis_router
 
 app.include_router(auth_router)
 app.include_router(user_router)
 app.include_router(videos_router)
+app.include_router(analysis_router)
 
 
 # ---------- 托管前端静态文件 ----------

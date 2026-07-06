@@ -500,7 +500,7 @@ async function startAnalysis() {
 
   try {
     var result = await api.createAnalysis(params);
-    sessionStorage.setItem('taskId', result.task_id);
+    sessionStorage.setItem('analysisTaskId', result.task_id);
     sessionStorage.setItem('analysisMode', selectedMode);
     sessionStorage.setItem('analysisVideo', selectedVideo ? selectedVideo.title : '');
     window.location.href = 'pipeline.html';
