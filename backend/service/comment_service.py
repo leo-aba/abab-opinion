@@ -2,7 +2,7 @@
 
 import uuid
 import logging
-from sqlalchemy import select, delete
+from sqlalchemy import delete, insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.models.comment import Comment
@@ -19,6 +19,8 @@ async def batch_upsert_comments(
 ) -> int:
     """批量写入评论，cid+platform 联合唯一防重复。
 
+    使用 INSERT IGNORE 确保数据库层面的幂等性，配合 Python 层批次内去重。
+
     Args:
         db: 数据库 session
         video_id: 视频 UUID
@@ -29,56 +31,56 @@ async def batch_upsert_comments(
         task_id: 关联的分析任务 ID（可空）
 
     Returns:
-        int: 实际新增的评论条数
+        int: 实际写入的评论条数
     """
     if not comments:
         return 0
 
-    # 1) 查询已存在的 cid 集合（避免逐条查）
-    cid_list = [c["cid"] for c in comments]
-    existing_result = await db.execute(
-        select(Comment.cid).where(
-            Comment.platform == platform,
-            Comment.cid.in_(cid_list),
-        )
-    )
-    existing_cids = {row[0] for row in existing_result.fetchall()}
-
-    # 2) 过滤出新增的评论
-    new_comments = []
+    # 1) 批次内去重
+    seen_cids: set[str] = set()
+    unique_comments: list[dict] = []
     for c in comments:
-        if c["cid"] in existing_cids:
+        cid = c["cid"]
+        if cid in seen_cids:
             continue
-        user_info = c.get("user", {})
-        new_comments.append(
-            Comment(
-                id=str(uuid.uuid4()),
-                cid=c["cid"],
-                video_id=video_id,
-                task_id=task_id,
-                text=c.get("text", ""),
-                create_time=c.get("create_time", 0),
-                digg_count=c.get("digg_count", 0),
-                reply_comment_total=c.get("reply_comment_total", 0),
-                user_uid=user_info.get("uid"),
-                user_nickname=user_info.get("nickname"),
-                user_avatar=user_info.get("avatar"),
-                platform=platform,
-            )
-        )
+        seen_cids.add(cid)
+        unique_comments.append(c)
 
-    if not new_comments:
+    if not unique_comments:
         return 0
 
-    # 3) 批量插入
-    db.add_all(new_comments)
+    # 2) 构建 INSERT IGNORE 语句（使用数据库列名）
+    from datetime import datetime
+    now = datetime.utcnow()
+    values = []
+    for c in unique_comments:
+        user_info = c.get("user", {})
+        values.append({
+            "id": str(uuid.uuid4()),
+            "platform_comment_id": c["cid"],
+            "video_id": video_id,
+            "task_id": task_id,
+            "content": c.get("text", ""),
+            "publish_time": c.get("create_time"),
+            "like_count": c.get("digg_count", 0),
+            "reply_count": c.get("reply_comment_total", 0),
+            "user_uid": user_info.get("uid"),
+            "author_name": user_info.get("nickname"),
+            "author_avatar": user_info.get("avatar"),
+            "platform": platform,
+            "fetched_at": now,
+        })
+
+    stmt = insert(Comment).prefix_with("IGNORE").values(values)
+    result = await db.execute(stmt)
     await db.flush()
 
+    inserted = result.rowcount
     logger.info(
-        "评论批量写入: video=%s, platform=%s, 新增=%d, 跳过=%d",
-        video_id, platform, len(new_comments), len(comments) - len(new_comments),
+        "评论批量写入: video=%s, platform=%s, 提交=%d, 跳过=%d",
+        video_id, platform, inserted, len(comments) - inserted,
     )
-    return len(new_comments)
+    return inserted
 
 
 async def delete_comments_by_video(db: AsyncSession, video_id: str) -> int:

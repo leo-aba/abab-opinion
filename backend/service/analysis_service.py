@@ -16,6 +16,7 @@ from backend.models.analysis_task import (
 from backend.service.video_service import (
     parse_video_url, find_video_by_platform_id, upsert_video,
     fetch_bilibili_video_info, fetch_bilibili_comments,
+    fetch_douyin_video_info, fetch_douyin_comments,
 )
 from backend.service.comment_service import batch_upsert_comments, delete_comments_by_video
 from backend.service.comment_cleaner import clean_comments
@@ -85,30 +86,24 @@ async def run_crawl_task(
                     setattr(task, k, v)
                 await sess.commit()
 
+    logger.info("run_crawl_task invoked: task_id=%s, video_id=%s, platform=%r, platform_video_id=%s, comment_limit=%s",
+                 task_id, video_id, platform, platform_video_id, comment_limit)
+
     raw_file_path = None
 
     try:
-        if platform != "bilibili":
-            raise ValueError(f"不支持的平台: {platform}")
-
-        # ── 1) 获取 aid ──
+        # ── 1) 获取视频元数据 ──
         async with get_sessionmaker()() as db:
             video = await db.get(Video, video_id)
             if video is None:
                 raise ValueError(f"视频不存在: {video_id}")
             extras = video.extras if video.extras else {}
-            aid = extras.get("aid")
-
-        if not aid:
-            raise ValueError(f"缺少 aid 字段，无法爬取评论 (video_id={video_id})")
 
         # ── 2) 状态 → collecting ──
         async with get_sessionmaker()() as db:
             await _update_status(db, AnalysisStatus.collecting, progress_pct=5)
 
-        logger.info("开始爬取 B站评论: aid=%s, max_count=%s", aid, comment_limit)
-
-        # ── 3) 爬取评论（带逐页进度回调）──
+        # ── 3) 爬取评论（根据平台分发）──
         crawl_db = await get_sessionmaker()().__aenter__()
         try:
             async def _crawl_progress(current: int, target: int):
@@ -124,14 +119,27 @@ async def run_crawl_task(
                     total_comments_processed=current,
                 )
 
-            raw_comments = await fetch_bilibili_comments(
-                aid, comment_limit,
-                progress_callback=_crawl_progress,
-            )
+            if platform == "bilibili":
+                aid = extras.get("aid")
+                if not aid:
+                    raise ValueError(f"缺少 aid 字段，无法爬取评论 (video_id={video_id})")
+                logger.info("开始爬取 B站评论: aid=%s, max_count=%s", aid, comment_limit)
+                raw_comments = await fetch_bilibili_comments(
+                    aid, comment_limit,
+                    progress_callback=_crawl_progress,
+                )
+            elif platform == "douyin":
+                logger.info("开始爬取抖音评论: video_id=%s, max_count=%s", platform_video_id, comment_limit)
+                raw_comments = await fetch_douyin_comments(
+                    platform_video_id, comment_limit,
+                    progress_callback=_crawl_progress,
+                )
+            else:
+                raise ValueError(f"不支持的平台: {platform}")
         finally:
             await crawl_db.__aexit__(None, None, None)
 
-        logger.info("B站评论爬取完成: aid=%s, 共 %s 条", aid, len(raw_comments))
+        logger.info("%s评论爬取完成: 共 %s 条", platform, len(raw_comments))
 
         # ── 4) 保存原始评论到本地 JSON ──
         raw_file_path = _DATA_DIR / f"raw_comments_{task_id}.json"
@@ -162,8 +170,9 @@ async def run_crawl_task(
             logger.info("已删除视频 %s 的旧评论 %d 条", video_id, deleted_count)
 
             # 7b) 写入清洗后的评论
+            logger.info("DEBUG: platform value before batch_upsert_comments = %r", platform)
             inserted = await batch_upsert_comments(
-                db, video_id, "bilibili", cleaned_comments, task_id,
+                db, video_id, platform, cleaned_comments, task_id,
             )
 
             # 7c) 完成 → 更新状态（包含清洗统计）
@@ -234,10 +243,13 @@ async def create_analysis_task(
             if info is None:
                 raise RuntimeError("获取视频信息失败，请检查链接是否正确")
             video = await upsert_video(db, info)
+        elif platform == "douyin":
+            info = await fetch_douyin_video_info(platform_video_id)
+            if info is None:
+                raise RuntimeError("获取抖音视频信息失败，请检查链接是否正确")
+            video = await upsert_video(db, info)
         else:
-            raise RuntimeError(
-                "抖音视频搜索暂不支持实时查询。请先在系统中录入该视频，或联系管理员。"
-            )
+            raise RuntimeError(f"不支持的平台: {platform}")
 
     # 3) 创建 AnalysisTask
     lang = language if language in ("zh", "en", "all") else "all"
