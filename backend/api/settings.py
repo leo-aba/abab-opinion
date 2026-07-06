@@ -12,6 +12,7 @@ from backend.models.user import User
 from backend.models.user_settings import UserSettings
 from backend.schemas.common import ok
 from backend.schemas.settings import SettingsData, AnalysisPreferences, NotificationPreferences, AccountInfo
+from backend.schemas.settings import UpdateAnalysisPreferencesRequest, UpdateNotificationPreferencesRequest
 
 logger = logging.getLogger("settings")
 
@@ -60,3 +61,54 @@ async def get_settings(
 
     logger.debug('用户"%s"获取设置%s', current_user.username, ' (已有记录)' if settings else ' (无记录，返回默认值)')
     return ok(_build_response(current_user, settings))
+
+
+# ---- 偏好更新 ----
+
+async def _get_or_create_settings(user_id: str, db: AsyncSession) -> UserSettings:
+    """获取用户设置记录，不存在则创建并返回默认值"""
+    result = await db.execute(select(UserSettings).where(UserSettings.user_id == user_id))
+    settings = result.scalar_one_or_none()
+    if settings is None:
+        settings = UserSettings(user_id=user_id)
+        db.add(settings)
+        await db.flush()
+    return settings
+
+
+@router.put("/analysis-preferences")
+async def update_analysis_preferences(
+    body: UpdateAnalysisPreferencesRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """更新分析偏好：default_comment_count / auto_ai_summary（部分更新）"""
+    settings = await _get_or_create_settings(current_user.id, db)
+
+    if body.default_comment_count is not None:
+        settings.default_comment_count = body.default_comment_count
+    if body.auto_ai_summary is not None:
+        settings.auto_generate_summary = body.auto_ai_summary  # 前端字段 → DB 列
+
+    await db.flush()
+    logger.info('用户"%s"更新分析偏好', current_user.username)
+    return ok(None, "分析偏好已保存")
+
+
+@router.put("/notification-preferences")
+async def update_notification_preferences(
+    body: UpdateNotificationPreferencesRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """更新通知偏好：analysis_complete_notify / anomaly_alert（部分更新）"""
+    settings = await _get_or_create_settings(current_user.id, db)
+
+    if body.analysis_complete_notify is not None:
+        settings.notify_on_complete = body.analysis_complete_notify  # 前端字段 → DB 列
+    if body.anomaly_alert is not None:
+        settings.notify_on_anomaly = body.anomaly_alert  # 前端字段 → DB 列
+
+    await db.flush()
+    logger.info('用户"%s"更新通知偏好', current_user.username)
+    return ok(None, "通知偏好已保存")

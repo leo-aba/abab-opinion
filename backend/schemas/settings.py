@@ -30,3 +30,15 @@ class SettingsData(BaseModel):
     analysis_preferences: AnalysisPreferences
     notification_preferences: NotificationPreferences
     account: AccountInfo
+
+
+class UpdateAnalysisPreferencesRequest(BaseModel):
+    """PUT /api/settings/analysis-preferences — 所有字段可选，只更新传入的"""
+    default_comment_count: int | None = None
+    auto_ai_summary: bool | None = None
+
+
+class UpdateNotificationPreferencesRequest(BaseModel):
+    """PUT /api/settings/notification-preferences — 所有字段可选，只更新传入的"""
+    analysis_complete_notify: bool | None = None
+    anomaly_alert: bool | None = None
