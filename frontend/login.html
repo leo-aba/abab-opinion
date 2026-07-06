@@ -146,6 +146,12 @@ async function doLogin() {
     const data = await api.login(username, password, remember);
     localStorage.setItem('token', data.token);
     localStorage.setItem('user', JSON.stringify(data.user));
+    // 记住我：保存用户名以便下次自动填充
+    if (remember) {
+      localStorage.setItem('remembered_username', username);
+    } else {
+      localStorage.removeItem('remembered_username');
+    }
     window.location.href = 'dashboard.html';
   } catch (err) {
     showError('login-error', err.message || '登录失败，请重试');
@@ -211,6 +217,15 @@ async function doRegister() {
     setButtonLoading(btn, false);
   }
 }
+
+// 页面加载时：如果之前勾选了"记住我"，自动填充用户名
+(function initRememberMe() {
+  const saved = localStorage.getItem('remembered_username');
+  if (saved) {
+    document.getElementById('login-username').value = saved;
+    document.getElementById('remember-me').checked = true;
+  }
+})();
 
 // 回车键自动提交：根据当前显示的卡片判断调用登录还是注册
 document.addEventListener('keydown', function(e) {

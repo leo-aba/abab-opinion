@@ -55,7 +55,8 @@ async def login(body: LoginRequest, db: AsyncSession = Depends(get_db)):
     user.last_login_at = datetime.now(timezone.utc)
     await db.flush()
 
-    token = create_access_token(user.id)
+    # 记住我 → 30 天有效期；否则使用全局默认（24 小时）
+    token = create_access_token(user.id, 30 * 24 * 3600 if body.remember else None)
     logger.info('用户"%s"登录成功', body.username)
     return ok({
         "token": token,
