@@ -14,67 +14,7 @@
 <body>
     <div class="page app-page active" id="page-app">
 
-        <!-- Sidebar Overlay (mobile) -->
-        <div class="sidebar-overlay" id="sidebar-overlay" onclick="toggleSidebar()"></div>
-
-        <!-- Sidebar -->
-        <aside class="sidebar" id="sidebar">
-            <div class="sidebar-logo">
-                <img src="logo.png" alt="Opinion AI Logo" style="width:32px;height:32px;">
-                Opinion AI
-            </div>
-
-            <nav class="sidebar-nav">
-                <div class="nav-section">主菜单</div>
-                <a href="dashboard.html" class="nav-item">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
-                    <span>Dashboard</span>
-                </a>
-                <a href="create-analysis.html" class="nav-item">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 8v8M8 12h8"/></svg>
-                    <span>创建分析</span>
-                </a>
-                <a href="pipeline.html" class="nav-item">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
-                    <span>实时分析</span>
-                </a>
-                <a href="tracking.html" class="nav-item" id="nav-tracking">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="4" fill="currentColor"/><line x1="12" y1="2" x2="12" y2="6"/><line x1="12" y1="18" x2="12" y2="22"/><line x1="2" y1="12" x2="6" y2="12"/><line x1="18" y1="12" x2="22" y2="12"/></svg>
-                    <span>实时追踪</span>
-                </a>
-                <a href="results.html" class="nav-item active">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 20V10M12 20V4M6 20v-6"/></svg>
-                    <span>分析结果</span>
-                </a>
-
-                <div class="nav-section">管理</div>
-                <a href="videos.html" class="nav-item">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>
-                    <span>视频管理</span>
-                </a>
-                <a href="history.html" class="nav-item">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-                    <span>历史记录</span>
-                </a>
-                <a href="settings.html" class="nav-item">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
-                    <span>系统设置</span>
-                </a>
-            </nav>
-
-            <div class="sidebar-footer">
-                <div class="sidebar-user">
-                    <div class="sidebar-avatar" id="sidebar-avatar-text">L</div>
-                    <div class="sidebar-user-info">
-                        <div class="sidebar-user-name" id="sidebar-display-name">—</div>
-                        <div class="sidebar-user-role" id="sidebar-role">—</div>
-                    </div>
-                </div>
-                <button class="logout-btn" onclick="doLogout()" title="退出登录">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9"/></svg>
-                </button>
-            </div>
-        </aside>
+        <div id="sidebar-container"></div>
 
         <!-- Main Content -->
         <main class="main-content">
@@ -329,15 +269,16 @@
         // 初始化 — 从 URL 取 task_id，加载概览
         // ============================================================
         window.addEventListener('DOMContentLoaded', function() {
+            loadSidebar('results');
+            initPage({ loadUser: true, loadHeaderStats: true });
+
             var params = new URLSearchParams(window.location.search);
             currentTaskId = params.get('task_id');
             if (!currentTaskId) {
                 showError('results-loading', '缺少 task_id 参数，请从分析任务列表进入。');
                 return;
             }
-            initPage({ loadUser: true, loadHeaderStats: true }).then(function() {
-                loadOverview();
-            });
+            loadOverview();
         });
 
         // ============================================================
