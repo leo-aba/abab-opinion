@@ -43,6 +43,7 @@ Thumbs.db
 # Test data
 test/*.json
 test/*.txt
+test/*.xlsx
 
 # Documents
 *.docx
