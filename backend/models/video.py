@@ -4,7 +4,7 @@ import uuid
 import enum
 from datetime import datetime
 
-from sqlalchemy import String, DateTime, Integer, Text, Enum as SAEnum
+from sqlalchemy import String, DateTime, Integer, Text, Enum as SAEnum, JSON
 from sqlalchemy.orm import Mapped, mapped_column
 
 from backend.database import Base
@@ -69,6 +69,9 @@ class Video(Base):
     )
     like_count: Mapped[int | None] = mapped_column(
         Integer, nullable=True, comment="点赞数"
+    )
+    extras: Mapped[dict | None] = mapped_column(
+        JSON, nullable=True, comment="平台额外数据（如 B站 aid）"
     )
     analysis_status: Mapped[AnalysisStatus] = mapped_column(
         SAEnum(AnalysisStatus), nullable=False, default=AnalysisStatus.pending,

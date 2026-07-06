@@ -1,15 +1,21 @@
 """分析任务 Service — 创建、查询分析任务"""
 
+import json
 import uuid
 import logging
+from fastapi import BackgroundTasks
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from backend.database import get_sessionmaker
+from backend.models.video import Video
 from backend.models.analysis_task import (
     AnalysisTask, AnalysisMode, AnalysisStatus, TimeRange, LanguageFilter,
 )
 from backend.service.video_service import (
-    parse_video_url, find_video_by_platform_id, upsert_video, fetch_bilibili_video_info,
+    parse_video_url, find_video_by_platform_id, upsert_video,
+    fetch_bilibili_video_info, fetch_bilibili_comments,
 )
+from backend.service.comment_service import batch_upsert_comments
 
 logger = logging.getLogger("analysis_service")
 
@@ -30,6 +36,117 @@ def _map_time_range(frontend_value: str) -> TimeRange:
     return _TIME_RANGE_MAP.get(frontend_value, TimeRange.all)
 
 
+async def run_crawl_task(
+    task_id: str,
+    video_id: str,
+    platform: str,
+    platform_video_id: str,
+    comment_limit: int,
+) -> None:
+    """后台爬取任务：在独立 DB session 中执行，更新任务状态。
+
+    状态流转: queued → collecting → completed / failed
+    """
+    logger.info("后台爬取任务启动: task_id=%s, video_id=%s", task_id, video_id)
+
+    async def _update_status(db: AsyncSession | None, status: AnalysisStatus, **kwargs):
+        """更新任务状态，若 db 为 None 则创建新 session。"""
+        if db is not None:
+            task = await db.get(AnalysisTask, task_id)
+            if task is None:
+                logger.error("任务不存在: %s", task_id)
+                return
+            task.status = status
+            for k, v in kwargs.items():
+                setattr(task, k, v)
+            await db.commit()
+        else:
+            async with get_sessionmaker()() as sess:
+                task = await sess.get(AnalysisTask, task_id)
+                if task is None:
+                    logger.error("任务不存在: %s", task_id)
+                    return
+                task.status = status
+                for k, v in kwargs.items():
+                    setattr(task, k, v)
+                await sess.commit()
+
+    try:
+        if platform != "bilibili":
+            raise ValueError(f"不支持的平台: {platform}")
+
+        # ── 1) 获取 aid ──
+        async with get_sessionmaker()() as db:
+            video = await db.get(Video, video_id)
+            if video is None:
+                raise ValueError(f"视频不存在: {video_id}")
+            extras = video.extras if video.extras else {}
+            aid = extras.get("aid")
+
+        if not aid:
+            raise ValueError(f"缺少 aid 字段，无法爬取评论 (video_id={video_id})")
+
+        # ── 2) 状态 → collecting ──
+        async with get_sessionmaker()() as db:
+            await _update_status(db, AnalysisStatus.collecting, progress_pct=5)
+
+        logger.info("开始爬取 B站评论: aid=%s, max_count=%s", aid, comment_limit)
+
+        # ── 3) 爬取评论（带逐页进度回调）──
+        crawl_db = await get_sessionmaker()().__aenter__()
+        try:
+            async def _crawl_progress(current: int, target: int):
+                """每页抓取后的进度回调"""
+                if target > 0:
+                    # progress_pct: 10% → 80% 映射到爬取阶段
+                    pct = 10 + int((current / target) * 70)
+                    pct = min(max(pct, 10), 80)
+                else:
+                    pct = 10
+                await _update_status(
+                    crawl_db, AnalysisStatus.collecting,
+                    progress_pct=pct,
+                    total_comments_processed=current,
+                )
+
+            raw_comments = await fetch_bilibili_comments(
+                aid, comment_limit,
+                progress_callback=_crawl_progress,
+            )
+        finally:
+            await crawl_db.__aexit__(None, None, None)
+
+        logger.info("B站评论爬取完成: aid=%s, 共 %s 条", aid, len(raw_comments))
+
+        # ── 4) 批量写入 DB ──
+        async with get_sessionmaker()() as db:
+            inserted = await batch_upsert_comments(
+                db, video_id, "bilibili", raw_comments, task_id
+            )
+            await _update_status(
+                db, AnalysisStatus.completed,
+                progress_pct=100,
+                total_comments_processed=inserted,
+            )
+
+        logger.info(
+            "后台爬取任务完成: task_id=%s, 新增评论=%d",
+            task_id, inserted,
+        )
+
+    except Exception as e:
+        logger.error("后台爬取任务失败: task_id=%s, error=%s", task_id, e)
+        try:
+            async with get_sessionmaker()() as db:
+                await _update_status(
+                    db, AnalysisStatus.failed,
+                    error_message=str(e),
+                    progress_pct=0,
+                )
+        except Exception as db_e:
+            logger.error("更新失败状态时出错: %s", db_e)
+
+
 async def create_analysis_task(
     db: AsyncSession,
     user_id: str,
@@ -38,6 +155,7 @@ async def create_analysis_task(
     comment_count: int,
     time_range: str,
     language: str,
+    background_tasks: BackgroundTasks | None = None,
 ) -> AnalysisTask:
     """创建分析任务。
 
@@ -45,6 +163,7 @@ async def create_analysis_task(
     1. 解析 video_url → (platform, platform_video_id)
     2. 查找或创建 Video 记录（复用 video_service）
     3. 创建 AnalysisTask 记录，status='queued'
+    4. 注册后台爬取任务（如果提供 background_tasks）
 
     Raises:
         ValueError: URL 无法识别
@@ -83,6 +202,17 @@ async def create_analysis_task(
     )
     db.add(task)
     await db.flush()
+
+    # 4) 注册后台爬取任务
+    if background_tasks is not None:
+        background_tasks.add_task(
+            run_crawl_task,
+            task_id=task.id,
+            video_id=video.id,
+            platform=platform,
+            platform_video_id=platform_video_id,
+            comment_limit=comment_count,
+        )
 
     logger.info(
         "分析任务已创建: task_id=%s user=%s video=%s platform=%s mode=%s",

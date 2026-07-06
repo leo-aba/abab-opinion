@@ -163,7 +163,7 @@ const api = {
    * @param {string} platform - 平台: 'bilibili' | 'douyin'
    * @param {string} type     - 搜索类型: 'url' | 'bv' | 'av' | 'keyword'
    * @param {string} query    - 搜索内容
-   * @returns {Promise<Array<{video_id: string, title: string, cover_url: string, author: string, comment_count: number}>>}
+   * @returns {Promise<Array<{video_id: string, title: string, cover_url: string, uploader: string, comment_count: number}>>}
    */
   searchVideos(platform, type, query) {
     return get('/videos/search?platform=' + encodeURIComponent(platform) +
@@ -181,8 +181,8 @@ const api = {
   },
   /**
    * 创建分析任务
-   * @param {{platform: string, video_id: string, comment_count: string, time_range: string, language: string, analysis_mode: string}} params
-   * @returns {Promise<{task_id: number, status: string, message: string}>}
+   * @param {{mode: string, video_title: string, video_url: string, comment_count: number, time_range: string, language: string}} params
+   * @returns {Promise<{task_id: string, status: string}>}
    */
   createAnalysis(params) { return post('/analysis/create', params); },
 
@@ -192,7 +192,7 @@ const api = {
 
   /**
    * 创建 SSE 连接 → 实时获取分析进度
-   * @param {number} taskId - 分析任务 ID
+   * @param {string} taskId - 分析任务 ID
    * @returns {EventSource}
    */
   createEventSource(taskId) {
@@ -200,13 +200,13 @@ const api = {
   },
   /**
    * 轮询获取分析进度（SSE 备选方案）
-   * @param {number} taskId - 分析任务 ID
+   * @param {string} taskId - 分析任务 ID
    * @returns {Promise<{overall_pct: number, steps: Array, logs: Array}>}
    */
   getAnalysisProgress(taskId) { return get('/analysis/' + taskId + '/progress'); },
   /**
    * 分析完成后启动追踪模式
-   * @param {number} taskId - 分析任务 ID
+   * @param {string} taskId - 分析任务 ID
    * @returns {Promise<{tracking_id: number, initial_credits: number, estimated_hours: number}>}
    */
   startTracking(taskId) { return post('/analysis/' + taskId + '/start-tracking'); },
@@ -231,13 +231,13 @@ const api = {
 
   /**
    * 获取结果页概览数据
-   * @param {number} taskId - 分析任务 ID
+   * @param {string} taskId - 分析任务 ID
    * @returns {Promise<{video_title: string, total_comments: number, topic_count: number, positive_pct: number, negative_pct: number}>}
    */
   getResultsOverview(taskId) { return get('/results/' + taskId + '/overview'); },
   /**
    * 获取结果页评论趋势
-   * @param {number} taskId - 分析任务 ID
+   * @param {string} taskId - 分析任务 ID
    * @param {string} [granularity='day'] - 粒度: 'day' | 'hour' | 'week'
    * @returns {Promise<{labels: string[], values: number[]}>}
    */
@@ -248,7 +248,7 @@ const api = {
   getResultsTopics(taskId) { return get('/results/' + taskId + '/topics'); },
   /**
    * 获取单个 Topic 详情
-   * @param {number} taskId    - 分析任务 ID
+   * @param {string} taskId - 分析任务 ID
    * @param {string} topicName - Topic 名称（中文需前端自行 encodeURIComponent）
    * @returns {Promise<{topic_name: string, sample_comments: string[], keywords: string[], ai_summary: string}>}
    */
@@ -257,7 +257,7 @@ const api = {
   getResultsSentimentAttribute(taskId) { return get('/results/' + taskId + '/sentiment-attribute'); },
   /**
    * 获取详细时间趋势（多数据集）
-   * @param {number} taskId - 分析任务 ID
+   * @param {string} taskId - 分析任务 ID
    * @param {string} [granularity='day'] - 粒度: 'day' | 'hour' | 'week'
    * @returns {Promise<{labels: string[], datasets: Array<{label: string, values: number[], color: string}>}>}
    */
@@ -266,7 +266,7 @@ const api = {
   getResultsAISummary(taskId) { return get('/results/' + taskId + '/ai-summary'); },
   /**
    * 按关键词搜索评论
-   * @param {number} taskId   - 分析任务 ID
+   * @param {string} taskId - 分析任务 ID
    * @param {string} keyword  - 搜索关键词
    * @param {number} [page=1] - 页码
    * @param {number} [pageSize=20] - 每页数量
