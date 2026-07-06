@@ -9,6 +9,62 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="css/style.css">
+    <style>
+        /* 确认弹窗 — 浅色系 */
+        .confirm-overlay {
+            display: none; position: fixed; inset: 0;
+            background: rgba(0,0,0,0.15); z-index: 1000;
+            align-items: center; justify-content: center;
+        }
+        .confirm-dialog {
+            background: #fff;
+            border: 1px solid #e5e7eb;
+            border-radius: 16px; padding: 32px 28px 24px;
+            width: 420px; max-width: 92vw;
+            box-shadow: 0 8px 40px rgba(0,0,0,0.1);
+        }
+        .confirm-dialog h3 {
+            margin: 0 0 24px; font-size: 18px; font-weight: 600;
+            color: #1f2937;
+        }
+        .confirm-dialog .form-group { margin-bottom: 16px; }
+        .confirm-dialog .form-group:last-of-type { margin-bottom: 0; }
+        .confirm-dialog .form-group label {
+            display: block; font-size: 13px; font-weight: 500;
+            color: #6b7280; margin-bottom: 6px;
+        }
+        .confirm-dialog .form-group input {
+            width: 100%; padding: 10px 14px;
+            border: 1px solid #d1d5db; border-radius: 8px;
+            background: #f9fafb; color: #1f2937; font-size: 14px;
+            transition: border-color 0.2s;
+            box-sizing: border-box;
+        }
+        .confirm-dialog .form-group input:focus {
+            outline: none; border-color: #6366f1;
+            background: #fff; box-shadow: 0 0 0 3px rgba(99,102,241,0.1);
+        }
+        .confirm-buttons {
+            display: flex; gap: 12px; margin-top: 24px;
+        }
+        .confirm-buttons button {
+            flex: 1; font-size: 14px; padding: 10px 0;
+            border-radius: 8px; font-weight: 500;
+            text-align: center; cursor: pointer;
+            transition: all 0.2s;
+        }
+        .confirm-btn-cancel {
+            background: #f3f4f6; color: #374151; border: 1px solid #d1d5db;
+        }
+        .confirm-btn-cancel:hover { background: #e5e7eb; }
+        .confirm-btn-submit {
+            background: #6366f1; color: #fff; border: none;
+        }
+        .confirm-btn-submit:hover { background: #4f46e5; }
+        .confirm-btn-submit:disabled {
+            opacity: 0.6; pointer-events: none;
+        }
+    </style>
 </head>
 <body>
 
@@ -120,13 +176,6 @@
                         </div>
                         <div class="toggle-switch" id="toggle-auto-ai-summary" onclick="onToggleAutoAiSummary()"></div>
                     </div>
-                    <div class="setting-row">
-                        <div>
-                            <div class="setting-label">实时分析动画</div>
-                            <div class="setting-desc">展示 Pipeline 实时分析动画（关闭可提升性能）</div>
-                        </div>
-                        <div class="toggle-switch" id="toggle-realtime-animation" onclick="onToggleRealtimeAnimation()"></div>
-                    </div>
                 </div>
 
                 <div class="settings-section">
@@ -165,14 +214,27 @@
                     </div>
                     <div class="setting-row">
                         <div>
-                            <div class="setting-label">API Key</div>
-                            <div class="setting-desc" id="setting-apikey-value">—</div>
+                            <div class="setting-label">密码</div>
+                            <div class="setting-desc">••••••••</div>
                         </div>
-                        <button class="btn-outline" style="font-size:12px;padding:6px 14px;" onclick="onRegenerateApiKey()">重新生成</button>
+                        <button class="btn-outline" style="font-size:12px;padding:6px 14px;" onclick="onEditPassword()">修改</button>
                     </div>
                 </div>
             </div>
         </main>
+    </div>
+
+    <!-- 确认弹窗 -->
+    <div class="confirm-overlay" id="confirm-overlay" style="display:none;" onclick="closeConfirmDialog()">
+        <div class="confirm-dialog" onclick="event.stopPropagation()">
+            <h3 id="confirm-title">确认操作</h3>
+            <div id="confirm-fields"></div>
+            <div id="confirm-error" style="display:none; color:#ff4d4f; font-size:13px; margin-bottom:12px; padding:8px 12px; background:rgba(255,77,79,0.1); border-radius:6px;"></div>
+            <div class="confirm-buttons">
+                <button class="confirm-btn-cancel" onclick="closeConfirmDialog()">取消</button>
+                <button class="confirm-btn-submit" id="confirm-submit-btn">确认</button>
+            </div>
+        </div>
     </div>
 
     <!-- Scripts -->
@@ -180,6 +242,20 @@
     <script src="js/common.js"></script>
     <script>
 let currentSettings = null;
+
+/** 设置按钮 loading 状态 */
+function setButtonLoading(btn, loading) {
+    if (loading) {
+        btn.disabled = true;
+        btn.dataset.originalText = btn.textContent;
+        btn.textContent = '处理中...';
+        btn.style.pointerEvents = 'none';
+    } else {
+        btn.disabled = false;
+        btn.textContent = btn.dataset.originalText || btn.textContent;
+        btn.style.pointerEvents = 'auto';
+    }
+}
 
 /** 加载所有设置项并填充到表单 */
 async function loadSettings() {
@@ -194,7 +270,6 @@ async function loadSettings() {
                 countSelect.value = ap.default_comment_count;
             }
             setToggleState('toggle-auto-ai-summary', ap.auto_ai_summary);
-            setToggleState('toggle-realtime-animation', ap.realtime_animation);
         }
 
         // 通知偏好
@@ -209,7 +284,6 @@ async function loadSettings() {
             const acct = currentSettings.account;
             setText('setting-username-value', acct.username || '—');
             setText('setting-email-value', acct.email || '—');
-            setText('setting-apikey-value', acct.api_key_masked || '—');
         }
     } catch (e) {
         console.error('loadSettings error:', e);
@@ -256,20 +330,6 @@ async function onToggleAutoAiSummary() {
     }
 }
 
-/** 实时动画开关 → 保存 */
-async function onToggleRealtimeAnimation() {
-    const el = document.getElementById('toggle-realtime-animation');
-    const newVal = !el.classList.contains('on');
-    el.classList.toggle('on');
-    try {
-        await api.updateAnalysisPreferences({ realtime_animation: newVal });
-    } catch (e) {
-        console.error('update realtime_animation error:', e);
-        alert('保存失败：' + (e.message || '未知错误'));
-        await loadSettings();
-    }
-}
-
 // ---- 通知偏好变更处理 ----
 
 /** 分析完成通知开关 → 保存 */
@@ -302,44 +362,106 @@ async function onToggleAnomalyAlert() {
 
 // ---- 账户信息变更处理 ----
 
-/** 修改用户名 → 弹窗输入 → 调用 API */
-async function onEditUsername() {
+let _confirmCallback = null;
+
+/** 打开确认弹窗 */
+function openConfirmDialog(title, fields, onConfirm) {
+    document.getElementById('confirm-title').textContent = title;
+    const container = document.getElementById('confirm-fields');
+    let html = '';
+    fields.forEach(f => {
+        html += '<div class="form-group" style="margin-bottom:12px;">';
+        html += '<label>' + f.label + '</label>';
+        html += '<input type="' + (f.type || 'text') + '" id="confirm-field-' + f.id + '" placeholder="' + (f.placeholder || '') + '" style="width:100%;padding:8px 12px;border:1px solid var(--border);border-radius:6px;background:var(--bg-card);color:var(--text-primary);font-size:14px;">';
+        html += '</div>';
+    });
+    container.innerHTML = html;
+    document.getElementById('confirm-error').style.display = 'none';
+    document.getElementById('confirm-overlay').style.display = 'flex';
+    _confirmCallback = onConfirm;
+
+    // 绑定确认按钮
+    const submitBtn = document.getElementById('confirm-submit-btn');
+    submitBtn.onclick = async function() {
+        // 收集字段值
+        const values = {};
+        for (const f of fields) {
+            const el = document.getElementById('confirm-field-' + f.id);
+            values[f.id] = el.value.trim();
+        }
+        // 回调
+        try {
+            setButtonLoading(submitBtn, true);
+            document.getElementById('confirm-error').style.display = 'none';
+            await onConfirm(values);
+            closeConfirmDialog();
+        } catch (e) {
+            document.getElementById('confirm-error').textContent = e.message || '操作失败';
+            document.getElementById('confirm-error').style.display = 'block';
+            setButtonLoading(submitBtn, false);
+        }
+    };
+
+    // 回车快捷提交
+    container.querySelectorAll('input').forEach(input => {
+        input.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter') submitBtn.click();
+        });
+    });
+
+    // 自动聚焦第一个输入框
+    const firstInput = container.querySelector('input');
+    if (firstInput) firstInput.focus();
+}
+
+/** 关闭确认弹窗 */
+function closeConfirmDialog() {
+    document.getElementById('confirm-overlay').style.display = 'none';
+    _confirmCallback = null;
+}
+
+/** 修改用户名 */
+function onEditUsername() {
     const current = currentSettings && currentSettings.account ? currentSettings.account.username : '';
-    const newName = prompt('请输入新的用户名：', current);
-    if (newName === null || newName.trim() === '') return;
-    try {
-        await api.updateUsername(newName.trim());
+    openConfirmDialog('修改用户名', [
+        { id: 'new_username', label: '新用户名', type: 'text', placeholder: '请输入新用户名（至少3位）' },
+        { id: 'password', label: '当前密码', type: 'password', placeholder: '请输入当前密码以确认' }
+    ], async function(values) {
+        if (!values.new_username) throw new Error('请输入新用户名');
+        if (values.new_username.length < 3) throw new Error('用户名至少需要3位');
+        if (!values.password) throw new Error('请输入当前密码');
+        await api.updateUsername(values.password, values.new_username);
         await loadSettings();
-    } catch (e) {
-        console.error('update username error:', e);
-        alert('修改用户名失败：' + (e.message || '未知错误'));
-    }
+    });
 }
 
-/** 修改邮箱 → 弹窗输入 → 调用 API */
-async function onEditEmail() {
+/** 修改邮箱 */
+function onEditEmail() {
     const current = currentSettings && currentSettings.account ? currentSettings.account.email : '';
-    const newEmail = prompt('请输入新的邮箱：', current);
-    if (newEmail === null || newEmail.trim() === '') return;
-    try {
-        await api.updateEmail(newEmail.trim());
+    openConfirmDialog('修改邮箱', [
+        { id: 'new_email', label: '新邮箱', type: 'email', placeholder: '请输入新邮箱地址' },
+        { id: 'password', label: '当前密码', type: 'password', placeholder: '请输入当前密码以确认' }
+    ], async function(values) {
+        if (!values.new_email) throw new Error('请输入新邮箱');
+        if (!values.password) throw new Error('请输入当前密码');
+        await api.updateEmail(values.password, values.new_email);
         await loadSettings();
-    } catch (e) {
-        console.error('update email error:', e);
-        alert('修改邮箱失败：' + (e.message || '未知错误'));
-    }
+    });
 }
 
-/** 重新生成 API Key → 确认后调用 API */
-async function onRegenerateApiKey() {
-    if (!confirm('确定要重新生成 API Key 吗？旧的 Key 将立即失效。')) return;
-    try {
-        await api.regenerateApiKey();
-        await loadSettings();
-    } catch (e) {
-        console.error('regenerate api key error:', e);
-        alert('重新生成 API Key 失败：' + (e.message || '未知错误'));
-    }
+/** 修改密码 */
+function onEditPassword() {
+    openConfirmDialog('修改密码', [
+        { id: 'password', label: '当前密码', type: 'password', placeholder: '请输入当前密码' },
+        { id: 'new_password', label: '新密码', type: 'password', placeholder: '请输入新密码（至少6位）' },
+        { id: 'confirm_password', label: '确认新密码', type: 'password', placeholder: '请再次输入新密码' }
+    ], async function(values) {
+        if (!values.password) throw new Error('请输入当前密码');
+        if (!values.new_password) throw new Error('请输入新密码');
+        if (values.new_password.length < 6) throw new Error('新密码至少需要6位');
+        if (values.new_password !== values.confirm_password) throw new Error('两次输入的新密码不一致');
+        await api.updatePassword(values.password, values.new_password);
+    });
 }
 
 // 初始化：加载用户信息后获取设置

@@ -1,16 +1,24 @@
 """用户接口 — /api/user/*
 
 前端调用:
-  GET /api/user/profile  → 获取当前用户信息（侧边栏用）
+  GET /api/user/profile   → 获取当前用户信息（侧边栏用）
+  PUT /api/user/username  → 修改用户名（需密码确认）
+  PUT /api/user/email     → 修改邮箱（需密码确认）
+  PUT /api/user/password  → 修改密码（需旧密码确认）
 """
 
 import logging
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
+from backend.database import get_db
 from backend.dependencies import get_current_user
 from backend.models.user import User
 from backend.schemas.common import ok
+from backend.schemas.user import UpdateUsernameRequest, UpdateEmailRequest, UpdatePasswordRequest
+from backend.service.auth_service import verify_password, hash_password
 
 logger = logging.getLogger("user")
 
@@ -89,3 +97,76 @@ async def get_credits(
         "cost_unit": cost_unit,
         "can_afford": available >= estimated_cost,
     })
+
+
+# ---- 账户信息修改（均需密码二次确认） ----
+
+
+@router.put("/username")
+async def update_username(
+    body: UpdateUsernameRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """修改用户名：验证当前密码 + 检查唯一性"""
+    if not verify_password(body.password, current_user.password_hash):
+        logger.warning('用户"%s"修改用户名失败: 密码错误', current_user.username)
+        raise HTTPException(status_code=401, detail="当前密码错误")
+
+    # 检查新用户名是否被其他用户占用
+    result = await db.execute(
+        select(User).where(User.username == body.new_username, User.id != current_user.id)
+    )
+    if result.scalar_one_or_none():
+        raise HTTPException(status_code=409, detail="用户名已被占用")
+
+    old_username = current_user.username
+    current_user.username = body.new_username
+    await db.flush()
+
+    logger.info('用户"%s"修改用户名为"%s"', old_username, body.new_username)
+    return ok(None, "用户名修改成功")
+
+
+@router.put("/email")
+async def update_email(
+    body: UpdateEmailRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """修改邮箱：验证当前密码 + 检查唯一性"""
+    if not verify_password(body.password, current_user.password_hash):
+        logger.warning('用户"%s"修改邮箱失败: 密码错误', current_user.username)
+        raise HTTPException(status_code=401, detail="当前密码错误")
+
+    # 检查新邮箱是否被其他用户占用
+    if body.new_email:
+        result = await db.execute(
+            select(User).where(User.email == body.new_email, User.id != current_user.id)
+        )
+        if result.scalar_one_or_none():
+            raise HTTPException(status_code=409, detail="邮箱已被占用")
+
+    current_user.email = body.new_email or None
+    await db.flush()
+
+    logger.info('用户"%s"修改邮箱为"%s"', current_user.username, body.new_email)
+    return ok(None, "邮箱修改成功")
+
+
+@router.put("/password")
+async def update_password(
+    body: UpdatePasswordRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """修改密码：验证旧密码 + 哈希并保存新密码"""
+    if not verify_password(body.password, current_user.password_hash):
+        logger.warning('用户"%s"修改密码失败: 旧密码错误', current_user.username)
+        raise HTTPException(status_code=401, detail="当前密码错误")
+
+    current_user.password_hash = hash_password(body.new_password)
+    await db.flush()
+
+    logger.info('用户"%s"修改密码成功', current_user.username)
+    return ok(None, "密码修改成功")

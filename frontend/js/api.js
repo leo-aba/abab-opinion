@@ -324,9 +324,11 @@ const api = {
   /** 更新通知偏好 */
   updateNotificationPreferences(prefs) { return put('/settings/notification-preferences', prefs); },
   /** 修改用户名 */
-  updateUsername(username) { return put('/user/username', { username }); },
+  updateUsername(password, username) { return put('/user/username', { password, new_username: username }); },
   /** 修改邮箱 */
-  updateEmail(email) { return put('/user/email', { email }); },
+  updateEmail(password, email) { return put('/user/email', { password, new_email: email }); },
+  /** 修改密码 */
+  updatePassword(password, newPassword) { return put('/user/password', { password, new_password: newPassword }); },
   /** 重新生成 API Key */
   regenerateApiKey() { return post('/user/api-key/regenerate'); },
 };

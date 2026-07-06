@@ -18,9 +18,13 @@ def verify_password(password: str, password_hash: str) -> bool:
     return bcrypt.checkpw(password.encode("utf-8"), password_hash.encode("utf-8"))
 
 
-def create_access_token(user_id: str) -> str:
-    """签发 JWT 访问令牌，包含 user_id 和过期时间"""
-    expire = datetime.now(timezone.utc) + timedelta(seconds=JWT_EXPIRE_SECONDS)
+def create_access_token(user_id: str, expire_seconds: int | None = None) -> str:
+    """签发 JWT 访问令牌，包含 user_id 和过期时间
+
+    expire_seconds 为 None 时使用全局默认 JWT_EXPIRE_SECONDS
+    """
+    seconds = expire_seconds if expire_seconds is not None else JWT_EXPIRE_SECONDS
+    expire = datetime.now(timezone.utc) + timedelta(seconds=seconds)
     payload = {
         "sub": user_id,
         "exp": expire,
