@@ -177,12 +177,14 @@ from backend.api.user import router as user_router
 from backend.api.videos import router as videos_router
 from backend.api.analysis import router as analysis_router
 from backend.api.settings import router as settings_router
+from backend.api.dashboard import router as dashboard_router
 
 app.include_router(auth_router)
 app.include_router(user_router)
 app.include_router(videos_router)
 app.include_router(analysis_router)
 app.include_router(settings_router)
+app.include_router(dashboard_router)
 
 # 强制解析 _IncludedRouter 的候选路由，避免延迟解析问题
 app.openapi()
