@@ -175,6 +175,31 @@ function setHTML(id, html) {
 }
 
 /**
+ * 安全设置 DOM 元素属性（自动忽略不存在的元素）
+ * @param {string} id    - DOM 元素 ID
+ * @param {string} attr  - 属性名
+ * @param {string} value - 属性值
+ */
+function setAttr(id, attr, value) {
+  const el = document.getElementById(id);
+  if (el) el.setAttribute(attr, value);
+}
+
+/**
+ * 格式化数字（万、亿），视频信息卡片用
+ * @param {number|string} n - 数字
+ * @returns {string} 格式化后的字符串
+ */
+function formatCount(n) {
+  if (!n && n !== 0) return '—';
+  n = parseInt(n, 10);
+  if (isNaN(n)) return '—';
+  if (n >= 100000000) return (n / 100000000).toFixed(1) + '亿';
+  if (n >= 10000) return (n / 10000).toFixed(1) + '万';
+  return n.toLocaleString();
+}
+
+/**
  * 页面初始化：检查登录状态、加载用户信息和顶部统计
  * 所有需要登录的页面在 DOMContentLoaded 时应首先调用此函数
  * @param {{loadUser?: boolean, loadHeaderStats?: boolean}} [options] - 控制加载内容

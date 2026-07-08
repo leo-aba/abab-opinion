@@ -121,12 +121,21 @@ def _build_steps(status: str, progress_pct: int) -> list[dict]:
         (6, "AI 总结"),
     ]
 
-    # 已完成步骤数（基于 progress_pct 估算）
+    # 已完成步骤数（基于 status 和 progress_pct）
     if status == "completed":
         done_count = 6
     elif status == "failed":
-        # 如果失败在收集阶段，done_count 为 0
-        done_count = 0 if progress_pct < 10 else 1
+        # 根据进度判断失败时已完成几步
+        if progress_pct >= 88:
+            done_count = 5  # LLM 分析中失败
+        elif progress_pct >= 83:
+            done_count = 2  # 抓取+清洗完成
+        elif progress_pct >= 5:
+            done_count = 1  # 抓取进行中失败
+        else:
+            done_count = 0
+    elif status == "summarizing":
+        done_count = 5  # 前 5 步已过，第 6 步 AI 总结进行中
     elif status == "collecting":
         done_count = 0
     elif status == "cleaning":
@@ -139,7 +148,7 @@ def _build_steps(status: str, progress_pct: int) -> list[dict]:
         if step_num <= done_count:
             state = "done"
         elif step_num == done_count + 1 and (
-            status in ("collecting", "cleaning", "completed")
+            status in ("collecting", "cleaning", "summarizing", "completed")
             or (status == "failed" and step_num == 1)
         ):
             state = "running" if status != "failed" else "done"
@@ -166,6 +175,8 @@ def _build_hint(status: str, progress_pct: int, processed: int, limit: int) -> s
             return f"正在抓取评论 (已处理 {processed} 条)..."
     elif status == "cleaning":
         return "正在清洗评论数据..."
+    elif status == "summarizing":
+        return "正在进行 AI 分析，生成话题与综述..."
     elif status == "completed":
         return "分析完成！"
     elif status == "failed":
@@ -182,23 +193,36 @@ def _build_logs(status: str, task: AnalysisTask) -> list[dict]:
 
     logs.append({"time": task.created_at.strftime("%H:%M:%S") if task.created_at else now, "message": "任务已创建", "type": "info"})
 
-    if status in ("collecting", "cleaning", "completed"):
+    if status in ("collecting", "cleaning", "summarizing", "completed"):
         logs.append({"time": now, "message": f"开始抓取评论...", "type": "info"})
         if task.total_comments_processed > 0:
             logs.append({"time": now, "message": f"已完成抓取，共 {task.total_comments_processed} 条", "type": "success"})
 
-    if status == "cleaning":
+    if status in ("cleaning", "summarizing", "completed"):
         logs.append({"time": now, "message": "正在清洗评论数据...", "type": "info"})
 
+    if status == "summarizing":
+        logs.append({"time": now, "message": "正在进行 AI 分析（话题分类、情感分析、生成综述）...", "type": "info"})
+
     if status == "completed":
-        # 如果 error_message 中包含清洗统计，则附加展示
+        # 如果 error_message 中包含清洗统计和 AI 综述，则附加展示
         if task.error_message:
             try:
                 import json
-                clean_stats = json.loads(task.error_message)
-                logs.append({"time": now, "message": f"清洗完成: 原始 {clean_stats['total']} 条, 保留 {clean_stats['kept']} 条, 去除 {clean_stats['removed']} 条 (空={clean_stats['removed_empty']}, 表情={clean_stats['removed_emoji']}, 无意义={clean_stats['removed_meaningless']})", "type": "success"})
+                error_data = json.loads(task.error_message)
+                # 清洗统计
+                if "clean_stats" in error_data or "total" in error_data:
+                    cs = error_data.get("clean_stats", error_data)
+                    if isinstance(cs, dict) and "total" in cs:
+                        logs.append({"time": now, "message": f"清洗完成: 原始 {cs['total']} 条, 保留 {cs['kept']} 条, 去除 {cs['removed']} 条 (空={cs['removed_empty']}, 表情={cs['removed_emoji']}, 无意义={cs['removed_meaningless']})", "type": "success"})
+                # AI 综述
+                ai_summary = error_data.get("ai_summary", "") if isinstance(error_data, dict) else ""
+                if ai_summary:
+                    logs.append({"time": now, "message": f"AI 综述已生成 ({len(ai_summary)} 字)", "type": "success"})
             except (json.JSONDecodeError, KeyError):
                 pass
+        if task.topic_count > 0:
+            logs.append({"time": now, "message": f"共识别 {task.topic_count} 个话题", "type": "success"})
         logs.append({"time": now, "message": "分析任务全部完成", "type": "success"})
 
     if status == "failed" and task.error_message:

@@ -25,7 +25,6 @@
                         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
                     </button>
                     <h2>分析结果</h2>
-                    <div class="greeting" id="results-video-title">—</div>
                 </div>
                 <div class="header-right" style="display:flex;gap:24px;align-items:center;">
                     <div class="stat-item">
@@ -88,6 +87,30 @@
                     <div class="flex gap-4">
                         <button class="btn-sm" onclick="window.location.href='pipeline.html'">刷新数据</button>
                         <button class="btn-danger-sm" id="btn-stop-tracking" onclick="stopTracking()">停止追踪</button>
+                    </div>
+                </div>
+
+                <!-- Video Info Card -->
+                <div class="video-info-card" id="video-info-card" style="display:none; background:var(--black); border-radius:var(--radius-lg); border:2px solid #333; padding:20px 24px; margin-bottom:20px;">
+                    <div style="display:flex;gap:20px;align-items:flex-start;">
+                        <div style="flex-shrink:0;width:140px;height:88px;border-radius:8px;overflow:hidden;background:#222;">
+                            <img id="video-info-cover" src="" alt="" style="width:100%;height:100%;object-fit:cover;" onerror="this.style.display='none'">
+                        </div>
+                        <div style="flex:1;min-width:0;">
+                            <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;">
+                                <span id="video-info-platform" style="background:var(--orange);color:var(--cream);padding:2px 8px;border-radius:4px;font-size:11px;font-weight:600;">—</span>
+                                <h3 id="video-info-title" style="color:var(--cream);font-size:16px;font-weight:600;margin:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">—</h3>
+                            </div>
+                            <div style="display:flex;gap:20px;flex-wrap:wrap;color:#BFB59E;font-size:12px;margin-bottom:4px;">
+                                <span>UP 主：<strong id="video-info-uploader" style="color:var(--cream);">—</strong></span>
+                                <span>发布时间：<strong id="video-info-publish" style="color:var(--cream);">—</strong></span>
+                            </div>
+                            <div style="display:flex;gap:20px;flex-wrap:wrap;align-items:center;">
+                                <span style="font-size:12px;color:#BFB59E;">播放 <strong id="video-info-views" style="color:var(--cream);">—</strong></span>
+                                <span style="font-size:12px;color:#BFB59E;">点赞 <strong id="video-info-likes" style="color:var(--cream);">—</strong></span>
+                                <a id="video-info-link" href="#" target="_blank" style="font-size:12px;color:var(--orange);text-decoration:none;margin-left:auto;">查看原视频 →</a>
+                            </div>
+                        </div>
                     </div>
                 </div>
 
@@ -289,8 +312,21 @@
             if (!currentTaskId) return;
             try {
                 var overview = await api.getResultsOverview(currentTaskId);
+                // 填充视频信息卡片
+                var vidCard = document.getElementById('video-info-card');
+                if (vidCard) vidCard.style.display = '';
+                setText('video-info-title', overview.video_title || '—');
+                setAttr('video-info-cover', 'src', overview.video_cover || '');
+                setText('video-info-uploader', overview.video_uploader || '—');
+                setText('video-info-platform', overview.video_platform === 'bilibili' ? 'B站' : (overview.video_platform || '—'));
+                setText('video-info-views', formatCount(overview.video_view_count));
+                setText('video-info-likes', formatCount(overview.video_like_count));
+                setText('video-info-publish', overview.video_publish_time || '—');
+                if (overview.video_url) {
+                    setAttr('video-info-link', 'href', overview.video_url);
+                }
+
                 // 填充统计卡片
-                setText('results-video-title', overview.video_title || '—');
                 setText('ov-total-comments', (overview.total_comments || 0).toLocaleString());
                 setText('ov-topic-count', (overview.topic_count || 0).toString());
                 setText('ov-positive-pct', (overview.positive_pct || 0) + '%');
