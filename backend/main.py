@@ -179,6 +179,7 @@ from backend.api.analysis import router as analysis_router
 from backend.api.settings import router as settings_router
 from backend.api.dashboard import router as dashboard_router
 from backend.api.results import router as results_router
+from backend.api.history import router as history_router
 
 app.include_router(auth_router)
 app.include_router(user_router)
@@ -187,6 +188,7 @@ app.include_router(analysis_router)
 app.include_router(settings_router)
 app.include_router(dashboard_router)
 app.include_router(results_router)
+app.include_router(history_router)
 
 # 强制解析 _IncludedRouter 的候选路由，避免延迟解析问题
 app.openapi()
