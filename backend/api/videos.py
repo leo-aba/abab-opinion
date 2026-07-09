@@ -5,8 +5,10 @@ from fastapi import APIRouter, Depends, Query, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.database import get_db
+from backend.dependencies import get_current_user
+from backend.models.user import User
 from backend.schemas.common import ok
-from backend.service.video_service import search_video_by_url
+from backend.service.video_service import search_video_by_url, get_video_list
 
 logger = logging.getLogger("video_api")
 
@@ -41,3 +43,22 @@ async def search_videos(
     except RuntimeError as e:
         # 平台 API 错误等 → 502
         raise HTTPException(status_code=502, detail=str(e))
+
+
+@router.get("", summary="获取当前用户的视频列表")
+async def video_list(
+    page: int = Query(1, ge=1, description="页码"),
+    page_size: int = Query(20, ge=1, le=100, description="每页条数"),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """获取当前用户已分析过的视频列表（去重，按最近分析时间倒序）。
+
+    返回字段:
+    - total / total_pages / page / page_size: 分页信息
+    - items: 列表项，每项包含 video_id / title / cover_url / platform /
+             author / comment_count / status / last_analysis_date /
+             publish_date / new_comments_since_tracking
+    """
+    data = await get_video_list(db, current_user.id, page=page, page_size=page_size)
+    return ok(data)

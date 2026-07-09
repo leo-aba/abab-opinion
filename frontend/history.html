@@ -55,11 +55,10 @@
         <thead>
           <tr>
             <th>视频 <span class="sort-arrow">&#x2195;</span></th>
-            <th>平台</th>
-            <th>分析模式</th>
+            <th>平台 · 模式</th>
             <th>Topic数 <span class="sort-arrow">&#x2195;</span></th>
             <th>评论数 <span class="sort-arrow">&#x2195;</span></th>
-            <th>分析时间</th>
+            <th>创建时间</th>
             <th>操作</th>
           </tr>
         </thead>
@@ -101,7 +100,7 @@ async function loadHistory(page) {
         totalPages = data.total_pages || 1;
 
         if (!data.items || data.items.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:40px;color:var(--text-secondary);">暂无历史记录</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:40px;color:var(--text-secondary);">暂无历史记录</td></tr>';
             pagination.innerHTML = '';
             return;
         }
@@ -123,11 +122,10 @@ async function loadHistory(page) {
             html += `
             <tr>
                 <td style="font-weight:500;">${escapeHtml(item.video_title)}</td>
-                <td>${platformBadge}</td>
-                <td>${modeTag}</td>
+                <td>${platformBadge} ${modeTag}</td>
                 <td>${item.topic_count || 0}</td>
                 <td>${(item.comment_count || 0).toLocaleString()}</td>
-                <td>${escapeHtml(item.analyzed_at || '—')}${statusText ? ' · ' + escapeHtml(statusText) : ''}</td>
+                <td style="font-size:12px;color:#BFB59E;">${escapeHtml(item.created_at || '—')}${statusText ? ' · ' + escapeHtml(statusText) : ''}</td>
                 <td><a href="results.html?task_id=${encodeURIComponent(item.task_id)}" class="btn-sm">查看结果</a></td>
             </tr>`;
         }

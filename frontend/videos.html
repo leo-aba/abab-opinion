@@ -79,9 +79,9 @@ async function loadVideos() {
                 : '';
 
             html += `
-            <div class="video-card" onclick="window.location.href='results.html?task_id=${encodeURIComponent(v.video_id)}'">
+            <div class="video-card" onclick="window.location.href='results.html?task_id=${encodeURIComponent(v.task_id || v.video_id)}'">
                 <div class="video-card-cover" style="background:var(--cover-bg, #111);overflow:hidden;">
-                    ${v.cover_url ? '<img src="' + escapeHtml(v.cover_url) + '" alt="" style="width:100%;height:100%;object-fit:cover;">' : '<span style="color:var(--text-secondary);font-size:13px;">' + escapeHtml(coverTitle) + '</span>'}
+                    ${v.cover_url ? '<img src="' + escapeHtml(v.cover_url) + '" alt="" style="width:100%;height:100%;object-fit:cover;" onerror="this.style.display=\'none\'">' : '<span style="color:var(--text-secondary);font-size:13px;">' + escapeHtml(coverTitle) + '</span>'}
                     ${platformBadge}
                     ${v.status === 'tracking' ? '<span class="tracking-status-row" style="position:absolute;top:10px;right:10px;"><span class="tracking-live-dot"></span>追踪中</span>' : ''}
                 </div>

@@ -11,6 +11,7 @@ from backend.models.analysis_task import AnalysisTask
 from backend.models.video import Video
 from backend.models.topic import Topic
 from backend.models.comment import Comment
+from backend.service.video_service import _download_cover
 
 logger = logging.getLogger("results_service")
 
@@ -35,10 +36,24 @@ async def get_overview(db: AsyncSession, task_id: str) -> dict:
 
     video = await db.get(Video, task.video_id)
 
+    # ── 封面：远程 URL → 下载到本地（懒修复旧数据）──
+    cover_url = video.cover_url if video else ""
+    if cover_url and cover_url.startswith("http"):
+        try:
+            local = await _download_cover(cover_url)
+            if local:
+                cover_url = local
+                # 持久化本地路径，下次直接读取
+                if video:
+                    video.cover_url = local
+                    await db.commit()
+        except Exception:
+            pass  # 下载失败保留远程 URL，前端 onerror 兜底
+
     # ── 视频基础信息 ──
     video_info = {
         "video_title": video.title if video else "",
-        "video_cover": video.cover_url if video else "",
+        "video_cover": cover_url,
         "video_uploader": video.uploader_name if video else "",
         "video_platform": video.platform.value if video and hasattr(video.platform, 'value') else str(video.platform) if video else "",
         "video_url": video.url if video else "",
@@ -116,21 +131,49 @@ async def get_overview(db: AsyncSession, task_id: str) -> dict:
 async def get_sentiment_ratio(db: AsyncSession, task_id: str) -> dict:
     """获取情感比例分布。
 
+    优先从 topics 表的 sentiment_distribution_json 汇总（LLM 分析结果），
+    确保正/负/中性三分类齐全。若无 topic 数据，回退到 comment 级别统计。
+
     Returns:
         {positive: int, negative: int, neutral: int}
     """
-    result = await db.execute(
-        select(
-            func.sum(case((Comment.sentiment == "positive", 1), else_=0)),
-            func.sum(case((Comment.sentiment == "negative", 1), else_=0)),
-            func.sum(case((Comment.sentiment == "neutral", 1), else_=0)),
-        ).where(Comment.task_id == task_id)
+    pos_total = 0
+    neg_total = 0
+    neu_total = 0
+
+    # 从 topics 表聚合 LLM 生成的情感分布（含正确的中性计数）
+    topics_result = await db.execute(
+        select(Topic.sentiment_distribution_json).where(Topic.task_id == task_id)
     )
-    pos, neg, neu = result.one()
+    for row in topics_result.scalars().all():
+        if not row:
+            continue
+        try:
+            dist = json.loads(row) if isinstance(row, str) else row
+            pos_total += dist.get("positive", 0)
+            neg_total += dist.get("negative", 0)
+            neu_total += dist.get("neutral", 0)
+        except (json.JSONDecodeError, TypeError):
+            continue
+
+    # 若无 topic 数据，回退到 comment 级别统计
+    if pos_total + neg_total + neu_total == 0:
+        result = await db.execute(
+            select(
+                func.sum(case((Comment.sentiment == "positive", 1), else_=0)),
+                func.sum(case((Comment.sentiment == "negative", 1), else_=0)),
+                func.sum(case((Comment.sentiment == "neutral", 1), else_=0)),
+            ).where(Comment.task_id == task_id)
+        )
+        pos, neg, neu = result.one()
+        pos_total = pos or 0
+        neg_total = neg or 0
+        neu_total = neu or 0
+
     return {
-        "positive": pos or 0,
-        "negative": neg or 0,
-        "neutral": neu or 0,
+        "positive": pos_total,
+        "negative": neg_total,
+        "neutral": neu_total,
     }
 
 
