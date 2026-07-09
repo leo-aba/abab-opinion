@@ -259,7 +259,7 @@
                         addLog(getTimeStr(), '即将跳转至结果页...', 'info');
                         document.getElementById('progressHint').textContent = '分析完成！';
                         setTimeout(function () {
-                            window.location.href = 'results.html';
+                            window.location.href = 'results.html?task_id=' + taskId;
                         }, 2000);
                     }
                 });
@@ -367,7 +367,7 @@
                         } else {
                             addLog(getTimeStr(), '即将跳转至结果页...', 'info');
                             setTimeout(function () {
-                                window.location.href = 'results.html';
+                                window.location.href = 'results.html?task_id=' + taskId;
                             }, 2000);
                         }
                     }

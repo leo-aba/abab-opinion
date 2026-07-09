@@ -64,7 +64,7 @@ function renderSentimentPie(data) {
       labels: ['正面', '负面', '中性'],
       datasets: [{
         data: [data.positive, data.negative, data.neutral],
-        backgroundColor: ['#00B4CC', '#FF7A22', '#F8F2E4'],
+        backgroundColor: ['#00B4CC', '#FF7A22', '#A0A0A0'],
         borderColor: '#000000', borderWidth: 3, hoverBorderWidth: 4,
       }]
     },
@@ -131,8 +131,8 @@ function renderResultsTrend(data) {
       responsive: true, maintainAspectRatio: true,
       plugins: { legend: { display: false } },
       scales: {
-        x: { grid: { display: false }, ticks: { color: '#BFB59E' } },
-        y: { grid: { color: '#333' }, ticks: { color: '#BFB59E' }, beginAtZero: false }
+        x: { grid: { display: false }, ticks: { color: '#BFB59E' }, title: { display: true, text: '日期', color: '#BFB59E', font: { size: 12 } } },
+        y: { grid: { color: '#333' }, ticks: { color: '#BFB59E' }, beginAtZero: false, title: { display: true, text: '评论数', color: '#BFB59E', font: { size: 12 } } }
       }
     }
   });
@@ -152,7 +152,7 @@ function renderResultsPie(data) {
       labels: ['正面', '负面', '中性'],
       datasets: [{
         data: [data.positive, data.negative, data.neutral],
-        backgroundColor: ['#00B4CC', '#FF7A22', '#F8F2E4'],
+        backgroundColor: ['#00B4CC', '#FF7A22', '#A0A0A0'],
         borderColor: '#000000', borderWidth: 3,
       }]
     },
@@ -236,8 +236,8 @@ function renderTrendsDetail(data) {
       responsive: true, maintainAspectRatio: false,
       plugins: { legend: { position: 'top', labels: { color: '#BFB59E' } } },
       scales: {
-        x: { grid: { display: false }, ticks: { color: '#BFB59E' } },
-        y: { grid: { color: '#333' }, ticks: { color: '#BFB59E' } }
+        x: { grid: { display: false }, ticks: { color: '#BFB59E' }, title: { display: true, text: '日期', color: '#BFB59E', font: { size: 12 } } },
+        y: { grid: { color: '#333' }, ticks: { color: '#BFB59E' }, title: { display: true, text: '评论数', color: '#BFB59E', font: { size: 12 } } }
       },
       interaction: { mode: 'nearest', axis: 'x', intersect: false }
     }
