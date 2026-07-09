@@ -5,7 +5,7 @@
 """
 
 from datetime import datetime
-from sqlalchemy import String, BigInteger, Integer, Text, DateTime, ForeignKey, UniqueConstraint, Index
+from sqlalchemy import String, BigInteger, Integer, Float, Text, DateTime, ForeignKey, UniqueConstraint, Index
 from sqlalchemy.orm import Mapped, mapped_column
 from backend.database import Base
 
@@ -53,6 +53,28 @@ class Comment(Base):
     )
     fetched_at: Mapped[datetime] = mapped_column(
         DateTime, nullable=False, default=datetime.utcnow, comment="抓取时间"
+    )
+    language: Mapped[str | None] = mapped_column(
+        String(10), nullable=True, comment="评论语言代码"
+    )
+    embedding_json: Mapped[str | None] = mapped_column(
+        "embedding_json", Text, nullable=True, comment="JSON array of float values (embedding vector)"
+    )
+    sentiment: Mapped[str | None] = mapped_column(
+        String(16), nullable=True, comment="情感倾向: positive/negative/neutral"
+    )
+    sentiment_score: Mapped[float | None] = mapped_column(
+        "sentiment_score", Float, nullable=True, comment="情感分数"
+    )
+    topic_id: Mapped[str | None] = mapped_column(
+        String(36), ForeignKey("topics.id", ondelete="SET NULL"), nullable=True,
+        comment="所属话题 ID（FK → topics）"
+    )
+    is_cleaned: Mapped[bool] = mapped_column(
+        "is_cleaned", Integer, nullable=False, default=0, comment="是否已清洗"
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        "created_at", DateTime, nullable=False, default=datetime.utcnow, comment="入库时间"
     )
 
     __table_args__ = (

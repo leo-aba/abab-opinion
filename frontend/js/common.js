@@ -14,6 +14,81 @@ function closeSidebar() {
   document.getElementById('sidebar-overlay').classList.remove('show');
 }
 
+// ============================================================
+// SIDEBAR COMPONENT — 所有页面的共用侧边栏（单一定义，改一处全生效）
+// ============================================================
+
+/** 导航菜单数据结构 */
+var SIDEBAR_NAV = [
+  { section: '主菜单' },
+  { page: 'dashboard',       href: 'dashboard.html',       label: 'Dashboard',  svg: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>' },
+  { page: 'create-analysis', href: 'create-analysis.html', label: '创建分析',   svg: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 8v8M8 12h8"/></svg>' },
+  { page: 'pipeline',        href: 'pipeline.html',        label: '实时分析',   svg: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>' },
+  { page: 'tracking',        href: 'tracking.html',        label: '实时追踪',   svg: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="4" fill="currentColor"/><line x1="12" y1="2" x2="12" y2="6"/><line x1="12" y1="18" x2="12" y2="22"/><line x1="2" y1="12" x2="6" y2="12"/><line x1="18" y1="12" x2="22" y2="12"/></svg>', tracking: true },
+  { page: 'results',         href: 'results.html',         label: '分析结果',   svg: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 20V10M12 20V4M6 20v-6"/></svg>' },
+  { section: '管理' },
+  { page: 'videos',          href: 'videos.html',          label: '视频管理',   svg: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>' },
+  { page: 'history',         href: 'history.html',         label: '历史记录',   svg: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>' },
+  { page: 'settings',        href: 'settings.html',        label: '系统设置',   svg: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>' }
+];
+
+/**
+ * 动态注入侧边栏到 #sidebar-container
+ * 必须在 initPage() 之前调用，因为 initPage() 会往侧边栏 DOM 元素写入用户信息
+ *
+ * @param {string} activePage - 当前页面标识符，如 'dashboard'、'pipeline' 等
+ */
+function loadSidebar(activePage) {
+  var container = document.getElementById('sidebar-container');
+  if (!container) return;
+
+  // 构建导航项 HTML
+  var navItemsHtml = '';
+  for (var i = 0; i < SIDEBAR_NAV.length; i++) {
+    var item = SIDEBAR_NAV[i];
+    if (item.section) {
+      navItemsHtml += '<div class="nav-section">' + item.section + '</div>';
+      continue;
+    }
+    var isActive = item.page === activePage ? ' active' : '';
+    var trackingId = item.tracking ? ' id="nav-tracking"' : '';
+    var trackingDot = item.tracking ? '<span class="tracking-live-dot" id="sidebar-tracking-dot" style="display:none;"></span>' : '';
+    navItemsHtml += '<a href="' + item.href + '" class="nav-item' + isActive + '"' + trackingId + '>' +
+      item.svg +
+      '<span>' + item.label + '</span>' +
+      trackingDot +
+      '</a>';
+  }
+
+  // 注入侧边栏 HTML
+  container.innerHTML =
+    '<!-- Sidebar overlay (mobile) -->' +
+    '<div class="sidebar-overlay" id="sidebar-overlay" onclick="closeSidebar()"></div>' +
+    '<!-- Sidebar -->' +
+    '<aside class="sidebar" id="sidebar">' +
+    '  <div class="sidebar-logo">' +
+    '    <img src="logo.png" alt="Opinion AI" style="width:32px;height:32px;">' +
+    '    Opinion AI' +
+    '  </div>' +
+    '  <nav class="sidebar-nav">' +
+    navItemsHtml +
+    '  </nav>' +
+    '  <div class="sidebar-footer">' +
+    '    <div class="sidebar-user">' +
+    '      <div class="sidebar-avatar" id="sidebar-avatar-text">L</div>' +
+    '      <div class="sidebar-user-info">' +
+    '        <div class="sidebar-user-name" id="sidebar-display-name">加载中...</div>' +
+    '        <div class="sidebar-user-role" id="sidebar-role">—</div>' +
+    '      </div>' +
+    '    </div>' +
+    '    <button class="logout-btn" onclick="doLogout()">' +
+    '      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9"/></svg>' +
+    '      退出登录' +
+    '    </button>' +
+    '  </div>' +
+    '</aside>';
+}
+
 /** 退出登录 — 清除 token 和用户缓存，跳转登录页 */
 function doLogout() {
   localStorage.removeItem('token');
@@ -100,6 +175,31 @@ function setHTML(id, html) {
 }
 
 /**
+ * 安全设置 DOM 元素属性（自动忽略不存在的元素）
+ * @param {string} id    - DOM 元素 ID
+ * @param {string} attr  - 属性名
+ * @param {string} value - 属性值
+ */
+function setAttr(id, attr, value) {
+  const el = document.getElementById(id);
+  if (el) el.setAttribute(attr, value);
+}
+
+/**
+ * 格式化数字（万、亿），视频信息卡片用
+ * @param {number|string} n - 数字
+ * @returns {string} 格式化后的字符串
+ */
+function formatCount(n) {
+  if (!n && n !== 0) return '—';
+  n = parseInt(n, 10);
+  if (isNaN(n)) return '—';
+  if (n >= 100000000) return (n / 100000000).toFixed(1) + '亿';
+  if (n >= 10000) return (n / 10000).toFixed(1) + '万';
+  return n.toLocaleString();
+}
+
+/**
  * 页面初始化：检查登录状态、加载用户信息和顶部统计
  * 所有需要登录的页面在 DOMContentLoaded 时应首先调用此函数
  * @param {{loadUser?: boolean, loadHeaderStats?: boolean}} [options] - 控制加载内容
@@ -119,7 +219,7 @@ async function initPage(options) {
 
   try {
     // 加载用户信息 — 侧边栏头像、姓名、角色
-    if (options && options.loadUser !== false) {
+    if (!options || options.loadUser !== false) {
       result.user = await api.getUserProfile();
       setText('sidebar-display-name', result.user.username);
       setText('sidebar-role', result.user.role);

@@ -1,5 +1,6 @@
 """分析任务 Service — 创建、查询分析任务"""
 
+import asyncio
 import json
 import os
 import uuid
@@ -20,6 +21,9 @@ from backend.service.video_service import (
 )
 from backend.service.comment_service import batch_upsert_comments, delete_comments_by_video
 from backend.service.comment_cleaner import clean_comments
+from backend.service.llm_service import analyze_comments_with_llm
+from backend.models.comment import Comment
+from backend.models.topic import Topic
 
 logger = logging.getLogger("analysis_service")
 
@@ -106,13 +110,22 @@ async def run_crawl_task(
         # ── 3) 爬取评论（根据平台分发）──
         crawl_db = await get_sessionmaker()().__aenter__()
         try:
+            # 爬取阶段的进度权重占 5%→82%（共 77%）
+            _CRAWL_PCT_START = 5
+            _CRAWL_PCT_END = 82
+
             async def _crawl_progress(current: int, target: int):
-                """每页抓取后的进度回调，10% → 80% 映射到爬取阶段"""
+                """每页抓取后的进度回调。
+
+                已知 target 时按比例映射；target 未知（comment_limit=0）
+                时按已抓条数递增，每 20 条涨 1%，到 82% 封顶。
+                """
                 if target > 0:
-                    pct = 10 + int((current / target) * 70)
-                    pct = min(max(pct, 10), 80)
+                    pct = _CRAWL_PCT_START + int((current / target) * (_CRAWL_PCT_END - _CRAWL_PCT_START))
+                    pct = min(max(pct, _CRAWL_PCT_START), _CRAWL_PCT_END)
                 else:
-                    pct = 10
+                    # 未知总量时按条数递增：每抓 20 条涨 1%，最少 5%，最多 82%
+                    pct = min(_CRAWL_PCT_START + current // 20, _CRAWL_PCT_END)
                 await _update_status(
                     crawl_db, AnalysisStatus.collecting,
                     progress_pct=pct,
@@ -149,7 +162,7 @@ async def run_crawl_task(
 
         # ── 5) 状态 → cleaning，清洗评论 ──
         async with get_sessionmaker()() as db:
-            await _update_status(db, AnalysisStatus.cleaning, progress_pct=85)
+            await _update_status(db, AnalysisStatus.cleaning, progress_pct=83)
 
         cleaned_comments, clean_stats = clean_comments(raw_comments)
         logger.info(
@@ -175,17 +188,107 @@ async def run_crawl_task(
                 db, video_id, platform, cleaned_comments, task_id,
             )
 
-            # 7c) 完成 → 更新状态（包含清洗统计）
+            # 7c) 状态 → summarizing，开始 LLM 分析
+            await _update_status(
+                db, AnalysisStatus.summarizing,
+                progress_pct=88,
+                total_comments_processed=inserted,
+            )
+
+            # 7d) 查询刚写入的评论，调用 LLM 进行分析
+            from sqlalchemy import select
+            result = await db.execute(
+                select(Comment).where(
+                    Comment.video_id == video_id,
+                    Comment.platform == platform,
+                ).order_by(Comment.created_at)
+            )
+            db_comments = result.scalars().all()
+            logger.info("查询到 %d 条评论用于 LLM 分析", len(db_comments))
+
+            topic_count = 0
+            overall_summary = ""
+
+            if db_comments:
+                comments_for_llm = [{"text": c.text} for c in db_comments]
+
+                # 后台脉冲更新进度（LLM 调用期间从 88% → 98%，每 4s 涨 2%）
+                async def _pulse_llm_progress():
+                    for pct in range(90, 99, 2):
+                        await asyncio.sleep(4)
+                        try:
+                            await _update_status(
+                                db, AnalysisStatus.summarizing,
+                                progress_pct=pct,
+                            )
+                        except Exception:
+                            break  # session 可能已失效，忽略
+
+                pulse_task = asyncio.create_task(_pulse_llm_progress())
+                try:
+                    llm_result = await analyze_comments_with_llm(comments_for_llm)
+                finally:
+                    pulse_task.cancel()
+                    try:
+                        await pulse_task
+                    except asyncio.CancelledError:
+                        pass
+                topics_data = llm_result.get("topics", [])
+                overall_summary = llm_result.get("overall_summary", "")
+                aspects = llm_result.get("aspects", [])
+
+                total = len(db_comments)
+                for topic_data in topics_data:
+                    indices = topic_data.get("comment_indices", [])
+                    if not indices:
+                        continue
+
+                    topic = Topic(
+                        id=str(uuid.uuid4()),
+                        task_id=task_id,
+                        video_id=video_id,
+                        name=topic_data.get("name", "未命名话题"),
+                        comment_count=len(indices),
+                        percentage=round(len(indices) / total * 100, 1) if total > 0 else 0,
+                        keywords_json=json.dumps(topic_data.get("keywords", []), ensure_ascii=False),
+                        ai_summary=topic_data.get("summary", ""),
+                        sentiment_distribution_json=json.dumps(
+                            topic_data.get("sentiment", {}), ensure_ascii=False
+                        ),
+                    )
+                    db.add(topic)
+                    await db.flush()
+
+                    # 更新属于该话题的评论：设置 topic_id 和情感
+                    sentiment_dist = topic_data.get("sentiment", {})
+                    majority = max(sentiment_dist, key=sentiment_dist.get) if sentiment_dist else "neutral"
+
+                    for idx in indices:
+                        if isinstance(idx, int) and 0 <= idx < total:
+                            db_comments[idx].topic_id = topic.id
+                            db_comments[idx].sentiment = majority
+
+                topic_count = len(topics_data)
+                logger.info("LLM 分析完成: %d 个话题, 综述 %d 字", topic_count, len(overall_summary))
+            else:
+                logger.warning("没有评论可用于 LLM 分析")
+
+            # 7e) 完成 → 更新状态
+            error_data = {
+                "clean_stats": clean_stats,
+                "ai_summary": overall_summary,
+                "aspects": aspects,
+            }
             await _update_status(
                 db, AnalysisStatus.completed,
                 progress_pct=100,
-                total_comments_processed=inserted,
-                error_message=json.dumps(clean_stats, ensure_ascii=False),
+                topic_count=topic_count,
+                error_message=json.dumps(error_data, ensure_ascii=False),
             )
 
         logger.info(
-            "后台爬取任务完成: task_id=%s, 清洗后评论=%d (原始=%d)",
-            task_id, inserted, len(raw_comments),
+            "后台爬取任务完成: task_id=%s, 清洗后评论=%d (原始=%d), 话题数=%d",
+            task_id, inserted, len(raw_comments), topic_count,
         )
 
     except Exception as e:
