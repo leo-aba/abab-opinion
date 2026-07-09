@@ -328,6 +328,12 @@ function selectVideo(btn, title, commentCount) {
 
 /** 向导下一步 → 更新步骤面板和指示器；到第3步时加载积分 */
 async function wizardNext(step) {
+  // 从第1步进入第2步前，校验已选择视频
+  if (step === 2 && !selectedVideo) {
+    alert('请先搜索并在搜索结果中选择一个视频，才能进入下一步');
+    return;
+  }
+
   wizardStep = step;
   showWizardStep(step);
   updateStepIndicator(step);
