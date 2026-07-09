@@ -11,6 +11,7 @@ from backend.models.analysis_task import AnalysisTask
 from backend.models.video import Video
 from backend.models.topic import Topic
 from backend.models.comment import Comment
+from backend.service.video_service import _download_cover
 
 logger = logging.getLogger("results_service")
 
@@ -35,10 +36,24 @@ async def get_overview(db: AsyncSession, task_id: str) -> dict:
 
     video = await db.get(Video, task.video_id)
 
+    # ── 封面：远程 URL → 下载到本地（懒修复旧数据）──
+    cover_url = video.cover_url if video else ""
+    if cover_url and cover_url.startswith("http"):
+        try:
+            local = await _download_cover(cover_url)
+            if local:
+                cover_url = local
+                # 持久化本地路径，下次直接读取
+                if video:
+                    video.cover_url = local
+                    await db.commit()
+        except Exception:
+            pass  # 下载失败保留远程 URL，前端 onerror 兜底
+
     # ── 视频基础信息 ──
     video_info = {
         "video_title": video.title if video else "",
-        "video_cover": video.cover_url if video else "",
+        "video_cover": cover_url,
         "video_uploader": video.uploader_name if video else "",
         "video_platform": video.platform.value if video and hasattr(video.platform, 'value') else str(video.platform) if video else "",
         "video_url": video.url if video else "",

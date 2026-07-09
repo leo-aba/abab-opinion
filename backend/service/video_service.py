@@ -7,12 +7,17 @@ import re
 import uuid
 import logging
 from datetime import datetime
+from pathlib import Path
 
 import httpx
-from sqlalchemy import select
+from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.models.video import Video, Platform
+from backend.models.analysis_task import AnalysisTask
+
+PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
+_COVERS_DIR = PROJECT_ROOT / "data" / "covers"
 
 logger = logging.getLogger("video_service")
 
@@ -84,6 +89,32 @@ async def find_video_by_platform_id(
 
 
 # ──────────────────────────────────────────────
+# 封面下载
+# ──────────────────────────────────────────────
+
+
+async def _download_cover(cover_url: str, referer: str = "https://www.bilibili.com/") -> str | None:
+    """下载视频封面到本地 data/covers/，返回本地访问路径。
+
+    下载失败（超时、HTTP 错误、文件过小）时返回 None，
+    调用方应回退到远程 URL。
+    """
+    _COVERS_DIR.mkdir(parents=True, exist_ok=True)
+    filename = f"{uuid.uuid4().hex}.jpg"
+    filepath = _COVERS_DIR / filename
+    try:
+        async with httpx.AsyncClient(timeout=15) as client:
+            resp = await client.get(cover_url, headers={"Referer": referer})
+            if resp.status_code == 200 and len(resp.content) > 1024:
+                filepath.write_bytes(resp.content)
+                logger.info("封面已下载: %s → %s", cover_url[:60], filename)
+                return f"/covers/{filename}"
+    except Exception as e:
+        logger.warning("封面下载失败 (%s): %s", cover_url[:60], e)
+    return None
+
+
+# ──────────────────────────────────────────────
 # Bilibili API 抓取
 # ──────────────────────────────────────────────
 
@@ -116,12 +147,15 @@ async def fetch_bilibili_video_info(bvid: str) -> dict | None:
     if pubdate:
         publish_time = datetime.fromtimestamp(pubdate).strftime("%Y-%m-%d %H:%M:%S")
 
+    cover_url = video.get("pic") or None
+    local_cover = await _download_cover(cover_url) if cover_url else None
+
     return {
         "platform": Platform.bilibili.value,
         "platform_video_id": bvid,
         "title": video.get("title", ""),
         "description": video.get("desc") or None,
-        "cover_url": video.get("pic") or None,
+        "cover_url": local_cover or cover_url,
         "uploader_name": owner.get("name") or None,
         "uploader_id": str(owner["mid"]) if owner.get("mid") else None,
         "url": f"https://www.bilibili.com/video/{bvid}/",
@@ -367,16 +401,19 @@ async def fetch_douyin_video_info(video_id: str) -> dict | None:
         if create_time_ts:
             publish_time = datetime.fromtimestamp(create_time_ts).strftime("%Y-%m-%d %H:%M:%S")
 
+        cover_url = (
+            aweme.get("video", {}).get("cover", {}).get("url_list", [""])[0]
+            or aweme.get("video", {}).get("origin_cover", {}).get("url_list", [""])[0]
+            or None
+        )
+        local_cover = await _download_cover(cover_url, referer="https://www.douyin.com/") if cover_url else None
+
         return {
             "platform": Platform.douyin.value,
             "platform_video_id": video_id,
             "title": aweme.get("desc") or aweme.get("preview_title") or "",
             "description": aweme.get("desc") or None,
-            "cover_url": (
-                aweme.get("video", {}).get("cover", {}).get("url_list", [""])[0]
-                or aweme.get("video", {}).get("origin_cover", {}).get("url_list", [""])[0]
-                or None
-            ),
+            "cover_url": local_cover or cover_url,
             "uploader_name": author.get("nickname") or None,
             "uploader_id": str(author.get("uid", "")) if author.get("uid") else None,
             "url": f"https://www.douyin.com/video/{video_id}/",
@@ -560,4 +597,112 @@ def _video_to_search_item(video: Video) -> dict:
         "cover_url": video.cover_url,
         "uploader": video.uploader_name,  # 前端 create-analysis.html 使用 v.uploader
         "comment_count": video.comment_count,
+    }
+
+
+# ──────────────────────────────────────────────
+# 视频列表（视频管理页）
+# ──────────────────────────────────────────────
+
+
+async def get_video_list(
+    db: AsyncSession,
+    user_id: str,
+    *,
+    page: int = 1,
+    page_size: int = 20,
+) -> dict:
+    """查询当前用户关联的视频列表（去重，按最近分析时间倒序）。
+
+    Video 表无 user_id，通过 AnalysisTask 关联用户，同一个视频
+    只返回一次（取最新的分析时间）。
+
+    Returns:
+        {total, total_pages, page, page_size, items: [{video_id, title,
+          cover_url, platform, author, comment_count, status,
+          last_analysis_date, publish_date, new_comments_since_tracking}]}
+    """
+    import math
+
+    # 基础查询 — 去重 + 取最新分析时间
+    cols = [
+        Video.id.label("video_id"),
+        Video.title,
+        Video.cover_url,
+        Video.platform,
+        Video.uploader_name.label("author"),
+        Video.comment_count,
+        Video.analysis_status.label("status"),
+        Video.last_analysis_at,
+        Video.publish_time,
+    ]
+
+    # 子查询：每个视频取最新分析时间
+    latest_sub = (
+        select(
+            AnalysisTask.video_id,
+            func.max(AnalysisTask.created_at).label("latest_analysis"),
+        )
+        .where(AnalysisTask.user_id == user_id)
+        .group_by(AnalysisTask.video_id)
+        .subquery()
+    )
+
+    base_stmt = (
+        select(*cols, latest_sub.c.latest_analysis.label("last_analysis_date"))
+        .select_from(Video)
+        .join(latest_sub, Video.id == latest_sub.c.video_id)
+    )
+
+    # 统计总数
+    count_stmt = select(func.count()).select_from(base_stmt.subquery())
+    total = await db.scalar(count_stmt) or 0
+
+    # 排序 + 分页
+    base_stmt = base_stmt.order_by(latest_sub.c.latest_analysis.desc())
+    base_stmt = base_stmt.offset((page - 1) * page_size).limit(page_size)
+
+    result = await db.execute(base_stmt)
+    rows = result.all()
+
+    # 批量查询每行视频对应的最新 task_id（用于跳转结果页）
+    video_ids_in_page = [row.video_id for row in rows]
+    latest_task_map: dict[str, str] = {}
+    if video_ids_in_page:
+        task_rows = await db.execute(
+            select(AnalysisTask.video_id, AnalysisTask.id)
+            .where(
+                AnalysisTask.video_id.in_(video_ids_in_page),
+                AnalysisTask.user_id == user_id,
+            )
+            .order_by(AnalysisTask.created_at.desc())
+        )
+        for trow in task_rows.all():
+            if trow.video_id not in latest_task_map:
+                latest_task_map[trow.video_id] = trow.id
+
+    items = []
+    for row in rows:
+        items.append({
+            "video_id": row.video_id,
+            "task_id": latest_task_map.get(row.video_id, ""),
+            "title": row.title or "",
+            "cover_url": row.cover_url or "",
+            "platform": row.platform.value if hasattr(row.platform, "value") else str(row.platform),
+            "author": row.author or "",
+            "comment_count": row.comment_count or 0,
+            "status": row.status.value if hasattr(row.status, "value") else str(row.status or "pending"),
+            "last_analysis_date": row.last_analysis_date.strftime("%Y-%m-%d") if row.last_analysis_date else "",
+            "publish_date": row.publish_time.strftime("%Y-%m-%d") if row.publish_time else "",
+            "new_comments_since_tracking": 0,
+        })
+
+    total_pages = max(1, math.ceil(total / page_size)) if total > 0 else 1
+
+    return {
+        "total": total,
+        "total_pages": total_pages,
+        "page": page,
+        "page_size": page_size,
+        "items": items,
     }

@@ -180,6 +180,7 @@ from backend.api.settings import router as settings_router
 from backend.api.dashboard import router as dashboard_router
 from backend.api.results import router as results_router
 from backend.api.history import router as history_router
+from backend.api.stats import router as stats_router
 
 app.include_router(auth_router)
 app.include_router(user_router)
@@ -189,6 +190,7 @@ app.include_router(settings_router)
 app.include_router(dashboard_router)
 app.include_router(results_router)
 app.include_router(history_router)
+app.include_router(stats_router)
 
 # 强制解析 _IncludedRouter 的候选路由，避免延迟解析问题
 app.openapi()
@@ -203,6 +205,11 @@ frontend_dir = str(BASE_DIR / "frontend")
 # css / js / logo.png 等资源
 app.mount("/css", StaticFiles(directory=os.path.join(frontend_dir, "css")), name="css")
 app.mount("/js",  StaticFiles(directory=os.path.join(frontend_dir, "js")),  name="js")
+
+# 本地封面图片
+covers_dir = os.path.join(BASE_DIR, "data", "covers")
+os.makedirs(covers_dir, exist_ok=True)
+app.mount("/covers", StaticFiles(directory=covers_dir), name="covers")
 
 # 静态资源托管 — 使用 catch-all 路由替代 app.mount("/")
 # 重要: 路由注册顺序保证 API 优先匹配，GET 兜底才走这里

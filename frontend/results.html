@@ -94,7 +94,7 @@
                 <div class="video-info-card" id="video-info-card" style="display:none; background:var(--black); border-radius:var(--radius-lg); border:2px solid #333; padding:20px 24px; margin-bottom:20px;">
                     <div style="display:flex;gap:20px;align-items:flex-start;">
                         <div style="flex-shrink:0;width:140px;height:88px;border-radius:8px;overflow:hidden;background:#222;">
-                            <img id="video-info-cover" src="" alt="" style="width:100%;height:100%;object-fit:cover;" onerror="this.style.display='none'">
+                            <img id="video-info-cover" src="" alt="" style="width:100%;height:100%;object-fit:cover;display:none;">
                         </div>
                         <div style="flex:1;min-width:0;">
                             <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;">
@@ -317,6 +317,16 @@
                 if (vidCard) vidCard.style.display = '';
                 setText('video-info-title', overview.video_title || '—');
                 setAttr('video-info-cover', 'src', overview.video_cover || '');
+                // 封面显示逻辑：有 src 就显示，加载失败自动隐藏
+                var coverImg = document.getElementById('video-info-cover');
+                if (coverImg) {
+                    if (overview.video_cover) {
+                        coverImg.style.display = '';
+                        coverImg.onerror = function() { this.style.display = 'none'; };
+                    } else {
+                        coverImg.style.display = 'none';
+                    }
+                }
                 setText('video-info-uploader', overview.video_uploader || '—');
                 setText('video-info-platform', overview.video_platform === 'bilibili' ? 'B站' : (overview.video_platform || '—'));
                 setText('video-info-views', formatCount(overview.video_view_count));

@@ -1,14 +1,15 @@
 """Dashboard 服务层 — 聚合仪表盘所需的统计数据"""
 
 import logging
-from datetime import datetime
+from datetime import datetime, timedelta
 
-from sqlalchemy import select, func
+from sqlalchemy import select, func, case, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from backend.models.analysis_task import AnalysisTask
+from backend.models.analysis_task import AnalysisTask, AnalysisStatus
 from backend.models.comment import Comment
 from backend.models.topic import Topic
+from backend.models.video import Video
 
 logger = logging.getLogger("dashboard_service")
 
@@ -280,3 +281,222 @@ async def _count_sentiment_in_range(
     )
 
     return (positive_result.scalar() or 0, total_result.scalar() or 0)
+
+
+# ──────────────────────────────────────────────
+# Dashboard 图表数据
+# ──────────────────────────────────────────────
+
+
+async def _get_user_video_ids(db: AsyncSession, user_id: str) -> list[str]:
+    """获取用户所有分析任务关联的视频 ID（去重）。"""
+    rows = await db.execute(
+        select(func.distinct(AnalysisTask.video_id)).where(
+            AnalysisTask.user_id == user_id
+        )
+    )
+    return [row[0] for row in rows.all()]
+
+
+async def _get_user_task_ids(db: AsyncSession, user_id: str) -> list[str]:
+    """获取用户所有分析任务 ID。"""
+    rows = await db.execute(
+        select(AnalysisTask.id).where(AnalysisTask.user_id == user_id)
+    )
+    return [row[0] for row in rows.all()]
+
+
+async def get_dashboard_trend(
+    db: AsyncSession, user_id: str, days: int = 30
+) -> dict:
+    """获取近 N 天评论趋势数据（按天汇总）。
+
+    Returns:
+        {labels: [str], values: [int]}
+    """
+    video_ids = await _get_user_video_ids(db, user_id)
+    if not video_ids:
+        return {"labels": [], "values": []}
+
+    cutoff = datetime.utcnow() - timedelta(days=days)
+
+    rows = await db.execute(
+        select(
+            func.date(Comment.create_time).label("day"),
+            func.count(Comment.id).label("cnt"),
+        )
+        .where(
+            Comment.video_id.in_(video_ids),
+            Comment.create_time >= cutoff,
+        )
+        .group_by(text("day"))
+        .order_by(text("day"))
+    )
+    day_map = {}
+    for row in rows.all():
+        day_map[str(row.day)] = row.cnt
+
+    # 生成完整的日期序列（含零值日）
+    labels = []
+    values = []
+    for i in range(days):
+        d = cutoff + timedelta(days=i)
+        label = d.strftime("%m-%d")
+        key = d.strftime("%Y-%m-%d")
+        labels.append(label)
+        values.append(day_map.get(key, 0))
+
+    return {"labels": labels, "values": values}
+
+
+async def get_dashboard_sentiment_ratio(db: AsyncSession, user_id: str) -> dict:
+    """获取用户所有评论的情感比例分布。
+
+    Returns:
+        {positive: int, negative: int, neutral: int}
+    """
+    video_ids = await _get_user_video_ids(db, user_id)
+    if not video_ids:
+        return {"positive": 0, "negative": 0, "neutral": 0}
+
+    result = await db.execute(
+        select(
+            func.sum(case((Comment.sentiment == "positive", 1), else_=0)),
+            func.sum(case((Comment.sentiment == "negative", 1), else_=0)),
+            func.sum(case((Comment.sentiment == "neutral", 1), else_=0)),
+        ).where(Comment.video_id.in_(video_ids))
+    )
+    pos, neg, neu = result.one()
+    return {"positive": pos or 0, "negative": neg or 0, "neutral": neu or 0}
+
+
+async def get_dashboard_top_topics(
+    db: AsyncSession, user_id: str, limit: int = 10
+) -> list[dict]:
+    """获取用户范围内评论数最多的 TOP N 话题。
+
+    Returns:
+        [{topic_name: str, comment_count: int}]
+    """
+    task_ids = await _get_user_task_ids(db, user_id)
+    if not task_ids:
+        return []
+
+    result = await db.execute(
+        select(Topic.name, func.count(Comment.id).label("cnt"))
+        .join(Comment, Comment.topic_id == Topic.id)
+        .where(Topic.task_id.in_(task_ids))
+        .group_by(Topic.id, Topic.name)
+        .order_by(func.count(Comment.id).desc())
+        .limit(limit)
+    )
+    return [{"topic_name": row.name, "comment_count": row.cnt} for row in result.all()]
+
+
+async def get_dashboard_active_tracking(
+    db: AsyncSession, user_id: str
+) -> list[dict]:
+    """获取当前用户活跃的实时追踪任务列表。
+
+    只有 analysis_mode='tracking' 且状态为 completed 的任务
+    （追踪模式下分析完成后持续监控），才会出现在这里。
+    没有追踪任务时返回空数组，前端自动隐藏该区域。
+
+    Returns:
+        [{task_id, video_title, platform, author,
+          new_comments, credits_remaining, duration_seconds}]
+    """
+    result = await db.execute(
+        select(
+            AnalysisTask.id.label("task_id"),
+            Video.title.label("video_title"),
+            Video.platform,
+            Video.uploader_name.label("author"),
+            AnalysisTask.total_comments_processed.label("new_comments"),
+        )
+        .select_from(AnalysisTask)
+        .join(Video, AnalysisTask.video_id == Video.id)
+        .where(
+            AnalysisTask.user_id == user_id,
+            AnalysisTask.mode == "tracking",
+            AnalysisTask.status == AnalysisStatus.completed,
+        )
+        .order_by(AnalysisTask.completed_at.desc())
+        .limit(5)
+    )
+    items = []
+    for row in result.all():
+        items.append({
+            "task_id": row.task_id,
+            "video_title": row.video_title or "",
+            "platform": row.platform.value if hasattr(row.platform, "value") else str(row.platform),
+            "author": row.author or "",
+            "new_comments": row.new_comments or 0,
+            "credits_remaining": 0,
+            "duration_seconds": 0,
+        })
+    return items
+
+
+# ──────────────────────────────────────────────
+# 头部统计栏
+# ──────────────────────────────────────────────
+
+
+async def get_header_stats(db: AsyncSession, user_id: str) -> dict:
+    """获取页面顶部统计栏的 4 个数字。
+
+    Returns:
+        {today_comments: int, new_videos: int,
+         analysis_completion_rate: int, hot_topic: str}
+    """
+    now = datetime.utcnow()
+
+    # 今日评论数
+    today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    video_ids = await _get_user_video_ids(db, user_id)
+    today_comments = 0
+    if video_ids:
+        today_comments = await db.scalar(
+            select(func.count(Comment.id)).where(
+                Comment.video_id.in_(video_ids),
+                Comment.create_time >= today_start,
+            )
+        ) or 0
+
+    # 本月新增视频数
+    month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    new_videos = await db.scalar(
+        select(func.count(func.distinct(AnalysisTask.video_id))).where(
+            AnalysisTask.user_id == user_id,
+            AnalysisTask.created_at >= month_start,
+        )
+    ) or 0
+
+    # 分析完成率
+    total_tasks = await db.scalar(
+        select(func.count(AnalysisTask.id)).where(
+            AnalysisTask.user_id == user_id
+        )
+    ) or 0
+    completed = await db.scalar(
+        select(func.count(AnalysisTask.id)).where(
+            AnalysisTask.user_id == user_id,
+            AnalysisTask.status == AnalysisStatus.completed,
+        )
+    ) or 0
+    completion_rate = round(completed / total_tasks * 100) if total_tasks > 0 else 0
+
+    # 热门话题
+    task_ids = await _get_user_task_ids(db, user_id)
+    hot_topic = "暂无"
+    if task_ids:
+        hot_name, _ = await _get_hot_topic(db, task_ids)
+        hot_topic = hot_name
+
+    return {
+        "today_comments": today_comments,
+        "new_videos": new_videos,
+        "analysis_completion_rate": completion_rate,
+        "hot_topic": hot_topic,
+    }

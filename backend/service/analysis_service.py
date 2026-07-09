@@ -5,6 +5,7 @@ import json
 import os
 import uuid
 import logging
+from datetime import datetime, timezone
 from pathlib import Path
 from fastapi import BackgroundTasks
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -284,7 +285,16 @@ async def run_crawl_task(
                 progress_pct=100,
                 topic_count=topic_count,
                 error_message=json.dumps(error_data, ensure_ascii=False),
+                completed_at=datetime.utcnow(),
+                last_analysis_at=datetime.utcnow(),
             )
+
+            # 同步更新 Video 表的分析状态（视频管理页使用）
+            video = await db.get(Video, video_id)
+            if video:
+                video.analysis_status = "analyzed"
+                video.last_analysis_at = datetime.utcnow()
+                await db.commit()
 
         logger.info(
             "后台爬取任务完成: task_id=%s, 清洗后评论=%d (原始=%d), 话题数=%d",

@@ -21,6 +21,9 @@ _SORT_COLUMN_MAP = {
     "created_at": AnalysisTask.created_at,
 }
 
+# 默认按创建时间倒序（created_at 始终有值，completed_at 可能为 NULL）
+_DEFAULT_SORT_COL = AnalysisTask.created_at
+
 
 def _get_status_label(status: AnalysisStatus, mode: AnalysisMode) -> str:
     """将任务状态 + 模式转为前端展示标签"""
@@ -116,7 +119,7 @@ async def get_history_items(
     total = await db.scalar(count_stmt) or 0
 
     # ── 4. 排序 ──
-    order_col = _SORT_COLUMN_MAP.get(sort_by or "", AnalysisTask.completed_at)
+    order_col = _SORT_COLUMN_MAP.get(sort_by or "", _DEFAULT_SORT_COL)
     if sort_order == "asc":
         base_stmt = base_stmt.order_by(order_col.asc())
     else:
