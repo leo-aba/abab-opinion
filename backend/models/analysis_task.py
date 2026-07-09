@@ -97,6 +97,9 @@ class AnalysisTask(Base):
     duration_ms: Mapped[int | None] = mapped_column(
         Integer, nullable=True, comment="总耗时（毫秒）"
     )
+    analysis_method: Mapped[str] = mapped_column(
+        String(8), nullable=False, default="llm", comment="分析方法: llm | cluster"
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime, nullable=False, default=datetime.utcnow, comment="创建时间"
     )

@@ -36,3 +36,9 @@ python-dotenv>=1.0.0
 # --- 工具 ---
 pydantic>=2.5.0
 httpx>=0.26.0
+
+
+# --- 模型总结（聚类分析） ---
+umap-learn>=0.5.0
+hdbscan>=0.8.0
+jieba>=0.42.1

@@ -52,8 +52,8 @@
     </div>
 </main>
 
-<script src="js/api.js"></script>
-<script src="js/common.js"></script>
+<script src="js/api.js?v=2"></script>
+<script src="js/common.js?v=2"></script>
 <script>
 /** 加载视频列表网格 */
 async function loadVideos() {
@@ -78,8 +78,12 @@ async function loadVideos() {
                 ? '最后分析: ' + v.last_analysis_date
                 : '';
 
+            const videoUrl = v.url || buildVideoUrl(v.platform, v.platform_video_id) || '';
+            const cardOnClick = v.status === 'pending' && videoUrl
+                ? "goToCreateAnalysis('" + videoUrl + "')"
+                : "goToResults('" + (v.task_id || v.video_id) + "')";
             html += `
-            <div class="video-card" onclick="window.location.href='results.html?task_id=${encodeURIComponent(v.task_id || v.video_id)}'">
+            <div class="video-card" onclick="${cardOnClick}">
                 <div class="video-card-cover" style="background:var(--cover-bg, #111);overflow:hidden;">
                     ${v.cover_url ? '<img src="' + escapeHtml(v.cover_url) + '" alt="" style="width:100%;height:100%;object-fit:cover;" onerror="this.style.display=\'none\'">' : '<span style="color:var(--text-secondary);font-size:13px;">' + escapeHtml(coverTitle) + '</span>'}
                     ${platformBadge}
@@ -131,6 +135,20 @@ function getStatusClass(status) {
         default: return '';
     }
 }
+
+/** 根据平台和视频ID构造可访问的视频URL */
+function buildVideoUrl(platform, platformVideoId) {
+  if (!platformVideoId) return '';
+  if (platform === 'bilibili') return 'https://www.bilibili.com/video/' + platformVideoId;
+  if (platform === 'douyin') return 'https://www.douyin.com/video/' + platformVideoId;
+  return '';
+}
+
+/** 跳转到创建分析页面（带视频URL） */
+function goToCreateAnalysis(url) { window.location.href = 'create-analysis.html?url=' + encodeURIComponent(url); }
+
+/** 跳转到分析结果页面 */
+function goToResults(taskId) { window.location.href = 'results.html?task_id=' + encodeURIComponent(taskId); }
 
 /** 防 XSS 的 HTML 转义 */
 function escapeHtml(str) {

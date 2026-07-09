@@ -144,6 +144,14 @@
                   <div class="mode-feature">话题提取与关键词识别</div>
                   <div class="mode-feature">生成可下载分析报告</div>
                 </div>
+                <!-- 分析方式选择 -->
+                <div style="display:flex;justify-content:flex-end;align-items:center;gap:10px;margin-top:14px;padding-top:12px;border-top:1px solid #333;">
+                  <span style="font-size:12px;color:#BFB59E;">分析方式</span>
+                  <select id="analysis-method-select" onchange="selectAnalysisMethod(this.value)" onclick="event.stopPropagation();" style="background:#111;color:var(--cream);border:1px solid #555;border-radius:8px;padding:6px 28px 6px 12px;font-size:13px;cursor:pointer;appearance:auto;-webkit-appearance:auto;">
+                    <option value="llm">AI分析</option>
+                    <option value="cluster">模型总结</option>
+                  </select>
+                </div>
               </div>
             </div>
           </div>
@@ -200,12 +208,19 @@
   </div>
 </div>
 
-<script src="js/api.js"></script>
-<script src="js/common.js"></script>
+<script src="js/api.js?v=2"></script>
+<script src="js/common.js?v=2"></script>
 <script>
 let wizardStep = 1;
 let selectedVideo = null;       // { title, comment_count }
 let selectedMode = 'tracking';
+let selectedAnalysisMethod = 'llm';
+
+/** 选择分析方式：AI分析 / 模型总结 */
+function selectAnalysisMethod(method) {
+  selectedAnalysisMethod = method;
+  document.getElementById('analysis-method-select').value = method;
+}
 let currentFilterMode = 'count';  // 'count' | 'time'
 let selectedCount = '最近500条';     // 评论数量选中值
 let selectedTime = '最近7天';      // 时间范围选中值
@@ -220,6 +235,8 @@ function selectMode(mode) {
   document.getElementById('modeTracking').classList.remove('selected');
   document.getElementById('modeNormal').classList.remove('selected');
   document.getElementById(mode === 'tracking' ? 'modeTracking' : 'modeNormal').classList.add('selected');
+  // 切换到普通分析时默认选中 AI 分析
+  if (mode === 'normal') selectAnalysisMethod('llm');
 }
 
 /** 选中参数选项（评论数量/时间范围） */
@@ -399,7 +416,7 @@ function updateWizardSummary() {
     ? '按评论数量：' + selectedCount
     : '按时间范围：' + selectedTime;
   setText('summaryRange', rangeText);
-  setText('summaryMode', selectedMode === 'tracking' ? '实时追踪' : '普通分析');
+  setText('summaryMode', (selectedMode === 'tracking' ? '实时追踪' : '普通分析') + ' · ' + (selectedAnalysisMethod === 'cluster' ? '模型总结' : 'AI分析'));
 
   var warning = document.getElementById('trackingWarning');
   if (warning) warning.style.display = selectedMode === 'tracking' ? 'flex' : 'none';
@@ -439,6 +456,7 @@ async function startAnalysis() {
 
   var params = {
     mode: selectedMode,
+    analysis_method: selectedAnalysisMethod || 'llm',
     video_title: selectedVideo ? selectedVideo.title : '',
     video_url: document.getElementById('searchInput').value.trim(),
     comment_count: commentCount,
@@ -451,7 +469,7 @@ async function startAnalysis() {
     sessionStorage.setItem('analysisTaskId', result.task_id);
     sessionStorage.setItem('analysisMode', selectedMode);
     sessionStorage.setItem('analysisVideo', selectedVideo ? selectedVideo.title : '');
-    window.location.href = 'pipeline.html';
+    window.location.href = selectedMode === 'tracking' ? 'tracking.html' : 'pipeline.html';
   } catch (e) {
     alert('创建分析任务失败：' + e.message);
   }
@@ -479,7 +497,27 @@ function escapeAttr(str) {
   selectMode('tracking');
   renderRangeOptions();
   loadSidebar('create-analysis');
-  initPage({ loadUser: true, loadHeaderStats: true });
+  initPage({ loadUser: true, loadHeaderStats: true }).then(function() {
+    // 从视频管理跳转：自动填充URL并搜索
+    var urlParams = new URLSearchParams(window.location.search);
+    var videoUrl = urlParams.get('url');
+    if (videoUrl) {
+      document.getElementById('searchInput').value = videoUrl;
+      searchVideos().then(function() {
+        var checkResults = setInterval(function() {
+          var firstBtn = document.querySelector('#videoResults .btn-sm');
+          if (firstBtn && firstBtn.textContent !== '搜索中...') {
+            clearInterval(checkResults);
+            if (firstBtn.textContent.indexOf('选择') !== -1) {
+              firstBtn.click();
+              wizardNext(2);
+            }
+          }
+        }, 200);
+        setTimeout(function() { clearInterval(checkResults); }, 5000);
+      });
+    }
+  });
 })();
 </script>
 </body>
