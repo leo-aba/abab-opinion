@@ -377,13 +377,13 @@ async def stream_analysis_progress(
                     "overall_pct": pct,
                     "overall_hint": hint,
                     "steps": steps,
-                    "logs": _build_logs(status, fresh),
+                    "logs": _build_logs(status, fresh, fresh.analysis_method or "llm"),
                     "status": status,
                 }
                 yield f"event: progress\ndata: {json.dumps(progress_data)}\n\n"
 
                 # ── log event（增量推送）──
-                logs = _build_logs(status, fresh)
+                logs = _build_logs(status, fresh, fresh.analysis_method or "llm")
                 for i in range(last_log_count, len(logs)):
                     yield f"event: log\ndata: {json.dumps(logs[i])}\n\n"
                 last_log_count = len(logs)

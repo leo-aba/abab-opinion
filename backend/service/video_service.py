@@ -459,7 +459,7 @@ async def fetch_douyin_comments(
 
         # 访问视频页面建立上下文
         driver.get(f"https://www.douyin.com/video/{video_id}")
-        time.sleep(3)
+        await asyncio.sleep(3)
 
         while has_more:
             if max_count > 0 and len(all_comments) >= max_count:
@@ -498,7 +498,7 @@ async def fetch_douyin_comments(
             cursor = data.get("cursor", cursor)
 
             if has_more and (max_count == 0 or len(all_comments) < max_count):
-                time.sleep(sleep_sec)
+                await asyncio.sleep(sleep_sec)
 
     finally:
         driver.quit()
