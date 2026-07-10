@@ -89,12 +89,12 @@ async function loadTrackingTasks() {
             <div class="chart-card" style="margin-bottom:20px;">
                 <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
                     <div style="display:flex;align-items:center;gap:12px;">
-                        <div class="tracking-status-row"><span class="tracking-live-dot"></span>追踪中</div>
+                        <div class="tracking-status-row">${t.status === 'active' ? '<span class="tracking-live-dot"></span>追踪中' : '<span style="color:var(--text-secondary);">已停止</span>'}</div>
                         <h3 style="font-size:16px;font-weight:600;">${escapeHtml(t.video_title)}</h3>
                     </div>
                     <div style="display:flex;gap:8px;">
                         <a href="results.html?task_id=${encodeURIComponent(t.task_id)}" class="btn-sm" style="background:var(--orange);color:var(--cream);">查看结果</a>
-                        <button class="btn-danger-sm" onclick="stopTracking(${t.tracking_id})">停止追踪</button>
+                        <button class="btn-danger-sm" onclick="stopTracking('${t.tracking_id}')">停止追踪</button>
                     </div>
                 </div>
                 <div class="video-card-meta" style="margin-bottom:16px;">
@@ -137,8 +137,13 @@ async function loadTrackingTasks() {
 
 /** 停止指定追踪任务并刷新列表 */
 async function stopTracking(trackingId) {
+    if (!trackingId) {
+        console.error('stopTracking: trackingId is empty');
+        return;
+    }
     try {
-        await api.stopTracking(trackingId);
+        const result = await api.stopTracking(trackingId);
+        console.log('追踪已停止:', result);
         await loadTrackingTasks();
     } catch (e) {
         console.error('stopTracking error:', e);
@@ -162,8 +167,18 @@ function escapeHtml(str) {
 }
 
 // 初始化：加载用户信息后获取追踪任务
+let trackingPollTimer = null;
 loadSidebar('tracking');
-initPage().then(() => loadTrackingTasks());
+initPage().then(() => {
+    loadTrackingTasks();
+    // 每 5 秒自动刷新追踪任务列表
+    trackingPollTimer = setInterval(loadTrackingTasks, 5000);
+});
+
+// 页面离开时清理定时器
+window.addEventListener('beforeunload', () => {
+    if (trackingPollTimer) clearInterval(trackingPollTimer);
+});
 </script>
 </body>
 </html>

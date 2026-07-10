@@ -174,12 +174,12 @@ async def fetch_bilibili_video_info(bvid: str) -> dict | None:
 # ──────────────────────────────────────────────
 
 async def fetch_bilibili_comment_page(
-    aid: int, cursor: int = 0
+    aid: int, cursor: int = 0, mode: int = 3
 ) -> tuple[list[dict] | None, int | None, bool]:
     """抓取一页 B站一级评论（异步 httpx 版）。
 
     API: https://api.bilibili.com/x/v2/reply/main
-    参数: oid=aid, type=1(视频), mode=3(热度), next=cursor
+    参数: oid=aid, type=1(视频), mode=2(时间)/3(热度), next=cursor
 
     Returns:
         (replies, next_cursor, is_end)
@@ -188,7 +188,7 @@ async def fetch_bilibili_comment_page(
     params = {
         "oid": aid,
         "type": 1,
-        "mode": 3,
+        "mode": mode,
         "next": cursor,
     }
     url = "https://api.bilibili.com/x/v2/reply/main"

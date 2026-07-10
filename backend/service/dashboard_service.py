@@ -135,7 +135,11 @@ async def _count_comments_in_range(
     start: datetime,
     end: datetime | None,
 ) -> int:
-    """统计指定时间范围内、指定视频的评论数。end=None 表示到现在。"""
+    """统计指定时间范围内、指定视频的评论数。
+
+    注意：统计所有评论（不区分 is_cleaned），即清洗前总数。
+    end=None 表示到现在。
+    """
     conditions = [Comment.video_id.in_(video_ids), Comment.create_time >= start]
     if end is not None:
         conditions.append(Comment.create_time < end)
@@ -311,6 +315,9 @@ async def get_dashboard_trend(
 ) -> dict:
     """获取近 N 天评论趋势数据（按天汇总）。
 
+    注意：统计所有评论（含 is_cleaned=0 和 =1），即清洗前总数。
+    这与用户需求"评论数曲线图选清洗前的评论数"一致。
+
     Returns:
         {labels: [str], values: [int]}
     """
@@ -398,42 +405,56 @@ async def get_dashboard_active_tracking(
 ) -> list[dict]:
     """获取当前用户活跃的实时追踪任务列表。
 
-    只有 analysis_mode='tracking' 且状态为 completed 的任务
-    （追踪模式下分析完成后持续监控），才会出现在这里。
-    没有追踪任务时返回空数组，前端自动隐藏该区域。
+    从 TrackingTask 表 JOIN 获取真实追踪数据（新增评论数、积分余额、运行时长）。
 
     Returns:
         [{task_id, video_title, platform, author,
           new_comments, credits_remaining, duration_seconds}]
     """
+    from backend.models.tracking_task import TrackingTask, TrackingStatus
+    from backend.models.user import User
+
     result = await db.execute(
         select(
             AnalysisTask.id.label("task_id"),
             Video.title.label("video_title"),
             Video.platform,
             Video.uploader_name.label("author"),
-            AnalysisTask.total_comments_processed.label("new_comments"),
+            TrackingTask.new_comments_since_start.label("new_comments"),
+            TrackingTask.started_at,
+            TrackingTask.user_id,
         )
-        .select_from(AnalysisTask)
-        .join(Video, AnalysisTask.video_id == Video.id)
+        .select_from(TrackingTask)
+        .join(AnalysisTask, TrackingTask.analysis_task_id == AnalysisTask.id)
+        .join(Video, TrackingTask.video_id == Video.id)
         .where(
             AnalysisTask.user_id == user_id,
-            AnalysisTask.mode == "tracking",
-            AnalysisTask.status == AnalysisStatus.completed,
+            TrackingTask.status == TrackingStatus.active,
         )
-        .order_by(AnalysisTask.completed_at.desc())
+        .order_by(TrackingTask.started_at.desc())
         .limit(5)
     )
     items = []
+    now = datetime.utcnow()
     for row in result.all():
+        duration = 0
+        if row.started_at:
+            duration = int((now - row.started_at).total_seconds())
+
+        # 查询用户积分余额
+        credits_remaining = 0
+        user = await db.get(User, row.user_id)
+        if user:
+            credits_remaining = user.credits
+
         items.append({
             "task_id": row.task_id,
             "video_title": row.video_title or "",
             "platform": row.platform.value if hasattr(row.platform, "value") else str(row.platform),
             "author": row.author or "",
             "new_comments": row.new_comments or 0,
-            "credits_remaining": 0,
-            "duration_seconds": 0,
+            "credits_remaining": credits_remaining,
+            "duration_seconds": duration,
         })
     return items
 

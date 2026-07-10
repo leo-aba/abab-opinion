@@ -20,7 +20,7 @@ from backend.service.video_service import (
     fetch_bilibili_video_info, fetch_bilibili_comments,
     fetch_douyin_video_info, fetch_douyin_comments,
 )
-from backend.service.comment_service import batch_upsert_comments, delete_comments_by_video
+from backend.service.comment_service import batch_upsert_comments, delete_comments_by_video, mark_comments_cleaned
 from backend.service.comment_cleaner import clean_comments
 from backend.service.llm_service import analyze_comments_with_llm
 from backend.service.embed_cluster_service import analyze_comments as analyze_comments_cluster
@@ -179,31 +179,39 @@ async def run_crawl_task(
             logger.info("本地临时文件已删除: %s", raw_file_path)
             raw_file_path = None
 
-        # ── 7) 删除该视频旧评论 + 写入清洗后评论 ──
+        # ── 7) 写入 DB：删旧 → 插原始 → 标记清洗 → LLM 分析 ──
+        raw_count = len(raw_comments)
         async with get_sessionmaker()() as db:
-            # 7a) 删除旧评论
+            # 7a) 删除该视频旧评论（确保同一视频多次分析的初始数据干净）
             deleted_count = await delete_comments_by_video(db, video_id)
             logger.info("已删除视频 %s 的旧评论 %d 条", video_id, deleted_count)
 
-            # 7b) 写入清洗后的评论
-            logger.info("DEBUG: platform value before batch_upsert_comments = %r", platform)
+            # 7b) 将所有原始评论（含未清洗）写入 DB，is_cleaned=False
+            logger.info("写入 %d 条原始评论 (is_cleaned=False)", raw_count)
             inserted = await batch_upsert_comments(
-                db, video_id, platform, cleaned_comments, task_id,
+                db, video_id, platform, raw_comments, task_id, is_cleaned=False,
             )
 
-            # 7c) 状态 → summarizing，开始 LLM 分析
+            # 7c) 标记通过清洗的评论：is_cleaned=True，关联 task_id
+            cleaned_cids = [c["cid"] for c in cleaned_comments]
+            cleaned_count = await mark_comments_cleaned(db, video_id, cleaned_cids, task_id)
+            logger.info("标记清洗评论: %d 条 (原始=%d)", cleaned_count, raw_count)
+
+            # 7d) 状态 → summarizing，开始 LLM 分析
+            # total_comments_processed 存储清洗前（原始）评论数
             await _update_status(
                 db, AnalysisStatus.summarizing,
                 progress_pct=88,
-                total_comments_processed=inserted,
+                total_comments_processed=raw_count,
             )
 
-            # 7d) 查询刚写入的评论，调用 LLM 进行分析
+            # 7e) 只查询清洗后的评论用于 LLM 分析
             from sqlalchemy import select
             result = await db.execute(
                 select(Comment).where(
                     Comment.video_id == video_id,
                     Comment.platform == platform,
+                    Comment.is_cleaned == True,
                 ).order_by(Comment.created_at)
             )
             db_comments = result.scalars().all()
@@ -286,7 +294,7 @@ async def run_crawl_task(
             else:
                 logger.warning("没有评论可用于 LLM 分析")
 
-            # 7e) 完成 → 更新状态
+            # 7f) 完成 → 更新状态
             error_data = {
                 "clean_stats": clean_stats,
                 "ai_summary": overall_summary,
@@ -308,9 +316,28 @@ async def run_crawl_task(
                 video.last_analysis_at = datetime.utcnow()
                 await db.commit()
 
+            # 7g) 追踪模式：分析完成后自动启动追踪轮询
+            analysis_task_for_mode = await db.get(AnalysisTask, task_id)
+            if analysis_task_for_mode and analysis_task_for_mode.mode == AnalysisMode.tracking:
+                try:
+                    from backend.service.tracking_service import (
+                        create_tracking_task as create_tt, start_tracking as launch_tracking,
+                    )
+                    tracking = await create_tt(
+                        db, task_id, video_id, analysis_task_for_mode.user_id,
+                    )
+                    await db.commit()
+                    launch_tracking(tracking.id)
+                    logger.info(
+                        "追踪任务已自动启动: tracking_id=%s, task_id=%s",
+                        tracking.id, task_id,
+                    )
+                except Exception as track_err:
+                    logger.error("自动启动追踪失败 (task_id=%s): %s", task_id, track_err)
+
         logger.info(
-            "后台爬取任务完成: task_id=%s, 清洗后评论=%d (原始=%d), 话题数=%d",
-            task_id, inserted, len(raw_comments), topic_count,
+            "后台爬取任务完成: task_id=%s, 原始评论=%d, 清洗后=%d, 话题数=%d",
+            task_id, raw_count, cleaned_count, topic_count,
         )
 
     except Exception as e:

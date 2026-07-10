@@ -287,6 +287,7 @@
         var currentTrendGranularity = 'day'; // 趋势图粒度
         var tabsLoaded = {};               // 标签页懒加载标记
         var commentSearchTimer = null;      // 评论搜索防抖定时器
+        var resultsRefreshTimer = null;    // 追踪模式自动刷新定时器
 
         // ============================================================
         // 初始化 — 从 URL 取 task_id，加载概览
@@ -302,6 +303,14 @@
                 return;
             }
             loadOverview();
+
+            // 追踪模式下每 10 秒自动刷新概览数据
+            resultsRefreshTimer = setInterval(refreshIfTracking, 10000);
+        });
+
+        // 页面离开时清理定时器
+        window.addEventListener('beforeunload', function() {
+            if (resultsRefreshTimer) clearInterval(resultsRefreshTimer);
         });
 
         // ============================================================
@@ -365,12 +374,15 @@
         // ============================================================
         // 追踪状态条
         // ============================================================
+        var currentTrackingId = null;  // 追踪任务 ID（从 tracking-status 获取）
+
         /** 加载追踪状态条（结果页顶部） */
         async function loadTrackingStatus() {
             if (!currentTaskId) return;
             try {
                 var status = await api.getResultsTrackingStatus(currentTaskId);
                 if (status && status.is_tracking) {
+                    currentTrackingId = status.tracking_id;
                     var bar = document.getElementById('results-tracking-bar');
                     if (bar) bar.style.display = '';
                     setText('tracking-new', '+' + (status.new_comments || 0).toLocaleString());
@@ -378,6 +390,7 @@
                     setText('tracking-credits', (status.credits_remaining || 0).toLocaleString());
                     setText('tracking-elapsed', status.duration_formatted || formatDuration(status.duration_seconds || 0));
                 } else {
+                    currentTrackingId = null;
                     var bar = document.getElementById('results-tracking-bar');
                     if (bar) bar.style.display = 'none';
                 }
@@ -388,13 +401,47 @@
 
         /** 停止追踪并隐藏状态条 */
         function stopTracking() {
-            if (!currentTaskId) return;
-            api.stopTracking(currentTaskId).then(function() {
+            var tid = currentTrackingId || currentTaskId;
+            if (!tid) return;
+            api.stopTracking(tid).then(function() {
                 var bar = document.getElementById('results-tracking-bar');
                 if (bar) bar.style.display = 'none';
+                currentTrackingId = null;
+                if (resultsRefreshTimer) clearInterval(resultsRefreshTimer);
             }).catch(function(e) {
                 console.error('stopTracking error:', e);
             });
+        }
+
+        /** 追踪模式下自动刷新概览数据（趋势图+统计卡片+追踪状态条） */
+        async function refreshIfTracking() {
+            if (!currentTaskId) return;
+            try {
+                var status = await api.getResultsTrackingStatus(currentTaskId);
+                if (!status || !status.is_tracking) return;  // 非追踪模式，不刷新
+
+                // 刷新统计卡片
+                var overview = await api.getResultsOverview(currentTaskId);
+                setText('ov-total-comments', (overview.total_comments || 0).toLocaleString());
+                setText('ov-topic-count', (overview.topic_count || 0).toString());
+                setText('ov-positive-pct', (overview.positive_pct || 0) + '%');
+                setText('ov-negative-pct', (overview.negative_pct || 0) + '%');
+                setText('ov-neutral-pct', (overview.neutral_pct || 0) + '%');
+
+                // 刷新趋势图
+                var trendData = await api.getResultsTrend(currentTaskId, 'day');
+                renderResultsTrend(trendData);
+
+                // 刷新追踪状态条
+                currentTrackingId = status.tracking_id;
+                var bar = document.getElementById('results-tracking-bar');
+                if (bar) bar.style.display = '';
+                setText('tracking-new', '+' + (status.new_comments || 0).toLocaleString());
+                setText('tracking-total', (status.total_comments || 0).toLocaleString());
+                setText('tracking-credits', (status.credits_remaining || 0).toLocaleString());
+            } catch (e) {
+                console.error('refreshIfTracking error:', e);
+            }
         }
 
         // ============================================================
