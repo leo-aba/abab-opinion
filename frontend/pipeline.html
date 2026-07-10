@@ -403,8 +403,30 @@
         /** 分析完成后启动追踪模式：注册追踪任务、开始轮询状态 */
         async function initTrackingMode() {
             try {
-                const tracking = await api.startTracking(taskId);
-                trackingId = tracking.tracking_id;
+                // 先检查是否已有追踪（防止重复创建）
+                var existingStatus = await api.getResultsTrackingStatus(taskId);
+                if (existingStatus && existingStatus.is_tracking && existingStatus.tracking_id) {
+                    trackingId = existingStatus.tracking_id;
+                    addLog(getTimeStr(), '已有活跃追踪，直接连接 (ID: ' + trackingId + ')', 'info');
+                } else if (existingStatus && !existingStatus.is_tracking) {
+                    addLog(getTimeStr(), '追踪已结束，不再启动新追踪', 'warn');
+                    document.getElementById('progressHint').textContent = '追踪已停止。';
+                    setTimeout(function () {
+                        window.location.href = 'results.html?task_id=' + taskId;
+                    }, 2000);
+                    return;
+                } else {
+                    const tracking = await api.startTracking(taskId);
+                    trackingId = tracking.tracking_id;
+                    addLog(getTimeStr(), '实时追踪已启动 (ID: ' + trackingId + ')', 'success');
+                    if (tracking.initial_credits !== undefined) {
+                        window._trackingInitialCredits = tracking.initial_credits;
+                    }
+                    if (tracking.credits_per_hour !== undefined) {
+                        window._trackingCreditsPerHour = tracking.credits_per_hour;
+                    }
+                }
+
                 trackingActive = true;
 
                 document.getElementById('tracking-extension').style.display = 'block';
@@ -420,16 +442,6 @@
                     trackingDuration++;
                     updateTrackingDuration();
                 }, 1000);
-
-                // 记录初始积分
-                if (tracking.initial_credits !== undefined) {
-                    window._trackingInitialCredits = tracking.initial_credits;
-                }
-                if (tracking.credits_per_hour !== undefined) {
-                    window._trackingCreditsPerHour = tracking.credits_per_hour;
-                }
-
-                addLog(getTimeStr(), '实时追踪已启动 (ID: ' + trackingId + ')', 'success');
 
                 // 开始轮询追踪状态（每 5 秒）
                 updateTrackingUI();
@@ -566,9 +578,71 @@
             addLog(getTimeStr(), '分析任务ID: ' + taskId, 'info');
             addLog(getTimeStr(), '分析模式: ' + (selectedMode === 'tracking' ? '追踪模式' : '普通模式'), 'info');
 
-            // 3. 优先尝试 SSE 连接，失败自动降级轮询
+            // 3. 先检查任务是否已完成（回访场景）
+            try {
+                var progress = await api.getAnalysisProgress(taskId);
+                if (progress.status === 'completed') {
+                    addLog(getTimeStr(), '分析任务已完成', 'success');
+                    if (selectedMode === 'tracking') {
+                        // 追踪模式：检查是否已有活跃追踪
+                        var trackingStatus = await api.getResultsTrackingStatus(taskId);
+                        if (trackingStatus.is_tracking && trackingStatus.tracking_id) {
+                            // 已有活跃追踪 — 直接连上，不创建新的
+                            addLog(getTimeStr(), '检测到已有活跃追踪，重新连接...', 'info');
+                            trackingId = trackingStatus.tracking_id;
+                            trackingActive = true;
+                            document.getElementById('tracking-extension').style.display = 'block';
+                            document.getElementById('progressHint').textContent = '追踪运行中...';
+                            // 渲染已完成的步骤
+                            renderPipelineSteps(progress.steps);
+                            setAllStepsDone();
+                            document.getElementById('pipelinePct').textContent = '100%';
+                            document.getElementById('progressBar').style.width = '100%';
+                            // 开始轮询追踪状态
+                            trackingDurationTimer = setInterval(function () {
+                                trackingDuration++;
+                                updateTrackingDuration();
+                            }, 1000);
+                            updateTrackingUI();
+                            trackingInterval = setInterval(pollTrackingStatus, 5000);
+                            updateTrackingUIFromData(trackingStatus);
+                        } else {
+                            // 追踪已停止或无活跃追踪 → 跳转结果页
+                            addLog(getTimeStr(), '追踪已结束，跳转至结果页...', 'info');
+                            document.getElementById('progressHint').textContent = '追踪已停止，即将跳转...';
+                            setTimeout(function () {
+                                window.location.href = 'results.html?task_id=' + taskId;
+                            }, 1500);
+                        }
+                    } else {
+                        // 普通模式 → 直接跳转结果页
+                        addLog(getTimeStr(), '即将跳转至结果页...', 'info');
+                        document.getElementById('progressHint').textContent = '分析完成！';
+                        renderPipelineSteps(progress.steps);
+                        setAllStepsDone();
+                        document.getElementById('pipelinePct').textContent = '100%';
+                        document.getElementById('progressBar').style.width = '100%';
+                        setTimeout(function () {
+                            window.location.href = 'results.html?task_id=' + taskId;
+                        }, 2000);
+                    }
+                    return;  // 不进入 SSE/轮询流程
+                }
+            } catch (e) {
+                // 查询失败，降级到正常 SSE/轮询流程
+                addLog(getTimeStr(), '查询任务状态失败，尝试实时连接...', 'warn');
+            }
+
+            // 4. 优先尝试 SSE 连接，失败自动降级轮询
             connectSSE();
         });
+
+        /** 将所有 6 个步骤标记为已完成 */
+        function setAllStepsDone() {
+            for (var i = 1; i <= 6; i++) {
+                setPipeState(i, 'done');
+            }
+        }
 
         // 页面离开时清理所有连接和定时器
         window.addEventListener('beforeunload', function () {

@@ -27,11 +27,13 @@ async function request(method, path, body) {
   const opts = {
     method,
     headers: {
-      'Content-Type': 'application/json',
       'Authorization': 'Bearer ' + getToken()
     }
   };
-  if (body) opts.body = JSON.stringify(body);
+  if (body) {
+    opts.headers['Content-Type'] = 'application/json';
+    opts.body = JSON.stringify(body);
+  }
 
   let res;
   try {

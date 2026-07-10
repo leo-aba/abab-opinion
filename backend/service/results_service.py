@@ -62,9 +62,12 @@ async def get_overview(db: AsyncSession, task_id: str) -> dict:
         "video_publish_time": video.publish_time.strftime("%Y-%m-%d") if video and video.publish_time else "",
     }
 
-    # 评论总数
+    # 评论总数（只统计清洗后的有意义评论）
     total = await db.scalar(
-        select(func.count(Comment.id)).where(Comment.task_id == task_id)
+        select(func.count(Comment.id)).where(
+            Comment.task_id == task_id,
+            Comment.is_cleaned == True,
+        )
     ) or 0
 
     # 话题数
@@ -98,7 +101,10 @@ async def get_overview(db: AsyncSession, task_id: str) -> dict:
                     func.sum(case((Comment.sentiment == "positive", 1), else_=0)),
                     func.sum(case((Comment.sentiment == "negative", 1), else_=0)),
                     func.sum(case((Comment.sentiment == "neutral", 1), else_=0)),
-                ).where(Comment.task_id == task_id)
+                ).where(
+                    Comment.task_id == task_id,
+                    Comment.is_cleaned == True,
+                )
             )
             pos_total, neg_total, neu_total = sentiment_result.one()
             pos_total = pos_total or 0
@@ -163,7 +169,10 @@ async def get_sentiment_ratio(db: AsyncSession, task_id: str) -> dict:
                 func.sum(case((Comment.sentiment == "positive", 1), else_=0)),
                 func.sum(case((Comment.sentiment == "negative", 1), else_=0)),
                 func.sum(case((Comment.sentiment == "neutral", 1), else_=0)),
-            ).where(Comment.task_id == task_id)
+            ).where(
+                Comment.task_id == task_id,
+                Comment.is_cleaned == True,
+            )
         )
         pos, neg, neu = result.one()
         pos_total = pos or 0
@@ -220,10 +229,10 @@ async def get_topic_detail(db: AsyncSession, task_id: str, topic_name: str) -> d
     if not topic:
         raise ValueError(f"话题不存在: {topic_name}")
 
-    # 示例评论（最多 5 条）
+    # 示例评论（最多 5 条，只取清洗后的有意义评论）
     comments_result = await db.execute(
         select(Comment.text)
-        .where(Comment.topic_id == topic.id)
+        .where(Comment.topic_id == topic.id, Comment.is_cleaned == True)
         .limit(5)
     )
     sample_comments = [row[0] for row in comments_result.all()]
@@ -318,8 +327,11 @@ async def search_comments(
     Returns:
         {total: int, items: [{text, platform, time_ago, topic, likes, highlighted_text}]}
     """
-    # 基础查询
-    base_stmt = select(Comment).where(Comment.task_id == task_id)
+    # 基础查询（只搜索清洗后的有意义评论）
+    base_stmt = select(Comment).where(
+        Comment.task_id == task_id,
+        Comment.is_cleaned == True,
+    )
 
     if keyword:
         base_stmt = base_stmt.where(Comment.text.contains(keyword))
@@ -426,7 +438,7 @@ async def get_trend(
             date_col.label('dt'),
             func.count(Comment.id).label('cnt'),
         )
-        .where(Comment.task_id == task_id, Comment.create_time.isnot(None))
+        .where(Comment.task_id == task_id, Comment.is_cleaned == True, Comment.create_time.isnot(None))
         .group_by('dt')
         .order_by('dt')
     )
@@ -455,7 +467,7 @@ async def get_trends_detail(
             func.sum(case((Comment.sentiment == 'positive', 1), else_=0)).label('pos'),
             func.sum(case((Comment.sentiment == 'negative', 1), else_=0)).label('neg'),
         )
-        .where(Comment.task_id == task_id, Comment.create_time.isnot(None))
+        .where(Comment.task_id == task_id, Comment.is_cleaned == True, Comment.create_time.isnot(None))
         .group_by('dt')
         .order_by('dt')
     )

@@ -67,6 +67,48 @@ async def create_analysis(
         raise HTTPException(status_code=502, detail=str(e))
 
 
+@router.post("/{task_id}/start-tracking", summary="启动追踪模式")
+async def start_tracking(
+    task_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """分析完成后启动追踪模式，创建 TrackingTask 并开始后台轮询。
+
+    Returns:
+        {tracking_id, initial_credits, estimated_hours, credits_per_hour}
+    """
+    from backend.service.tracking_service import create_tracking_task, start_tracking as launch_tracking
+    from backend.models.analysis_task import AnalysisMode
+
+    task = await db.get(AnalysisTask, task_id)
+    if not task:
+        raise HTTPException(status_code=404, detail="分析任务不存在")
+    if task.user_id != current_user.id:
+        raise HTTPException(status_code=403, detail="无权访问")
+    if task.mode != AnalysisMode.tracking:
+        raise HTTPException(status_code=400, detail="该任务不是追踪模式")
+
+    try:
+        tracking = await create_tracking_task(db, task_id, task.video_id, current_user.id)
+        await db.commit()
+
+        # 启动后台轮询
+        launch_tracking(tracking.id)
+
+        user = await db.get(User, current_user.id)
+        credits = user.credits if user else 0
+
+        return ok({
+            "tracking_id": tracking.id,
+            "initial_credits": credits,
+            "estimated_hours": round(credits / tracking.credits_rate_per_hour, 1) if tracking.credits_rate_per_hour > 0 else 0,
+            "credits_per_hour": tracking.credits_rate_per_hour,
+        })
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
 @router.get("/{task_id}/progress", summary="查询分析任务进度")
 async def get_task_progress(
     task_id: str,

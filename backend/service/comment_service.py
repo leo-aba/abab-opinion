@@ -16,6 +16,7 @@ async def batch_upsert_comments(
     platform: str,
     comments: list[dict],
     task_id: str | None = None,
+    is_cleaned: bool = False,
 ) -> int:
     """批量写入评论，cid+platform 联合唯一防重复。
 
@@ -68,6 +69,7 @@ async def batch_upsert_comments(
             "author_name": user_info.get("nickname"),
             "author_avatar": user_info.get("avatar"),
             "platform": platform,
+            "is_cleaned": is_cleaned,
             "fetched_at": now,
         })
 
@@ -99,3 +101,48 @@ async def delete_comments_by_video(db: AsyncSession, video_id: str) -> int:
     await db.flush()
     logger.info("已删除视频 %s 的 %d 条评论", video_id, result.rowcount)
     return result.rowcount
+
+
+async def mark_comments_cleaned(
+    db: AsyncSession,
+    video_id: str,
+    cleaned_cids: list[str],
+    task_id: str,
+) -> int:
+    """标记清洗后的评论：设置 is_cleaned=1 并关联 task_id。
+
+    用于评论流水线改造后：先批量插入所有原始评论（is_cleaned=0），
+    清洗后通过此函数 UPDATE 通过清洗的子集。
+
+    Args:
+        db: 数据库 session
+        video_id: 视频 UUID
+        cleaned_cids: 通过清洗的评论的 platform_comment_id 列表
+        task_id: 关联的分析任务 ID
+
+    Returns:
+        int: 实际更新的行数
+    """
+    if not cleaned_cids:
+        return 0
+
+    from sqlalchemy import update
+    from backend.models.comment import Comment
+
+    stmt = (
+        update(Comment)
+        .where(
+            Comment.video_id == video_id,
+            Comment.cid.in_(cleaned_cids),
+        )
+        .values(is_cleaned=True, task_id=task_id)
+    )
+    result = await db.execute(stmt)
+    await db.flush()
+
+    updated = result.rowcount
+    logger.info(
+        "标记清洗评论: video=%s, 提交=%d, 实际更新=%d",
+        video_id, len(cleaned_cids), updated,
+    )
+    return updated

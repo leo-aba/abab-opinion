@@ -30,11 +30,29 @@ logger = logging.getLogger("main")
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """启动时初始化数据库并注册关闭回调"""
+    """启动时初始化数据库、恢复追踪任务；关闭时优雅停止"""
     logger.info("正在启动服务...")
     await init_db()
     logger.info("数据库初始化完成")
+
+    # 恢复活跃的追踪任务
+    try:
+        from backend.service.tracking_service import resume_all_active_trackings
+        resumed = await resume_all_active_trackings()
+        if resumed:
+            logger.info("已恢复 %d 个活跃追踪任务", resumed)
+    except Exception as e:
+        logger.error("恢复追踪任务失败: %s", e)
+
     yield
+
+    # 关闭时停止所有追踪轮询
+    try:
+        from backend.service.tracking_service import shutdown_all_trackings
+        await shutdown_all_trackings()
+    except Exception as e:
+        logger.error("关闭追踪任务失败: %s", e)
+
     await close_db()
     logger.info("数据库连接池已释放")
 
@@ -181,6 +199,7 @@ from backend.api.dashboard import router as dashboard_router
 from backend.api.results import router as results_router
 from backend.api.history import router as history_router
 from backend.api.stats import router as stats_router
+from backend.api.tracking import router as tracking_router
 
 app.include_router(auth_router)
 app.include_router(user_router)
@@ -191,6 +210,7 @@ app.include_router(dashboard_router)
 app.include_router(results_router)
 app.include_router(history_router)
 app.include_router(stats_router)
+app.include_router(tracking_router)
 
 # 强制解析 _IncludedRouter 的候选路由，避免延迟解析问题
 app.openapi()

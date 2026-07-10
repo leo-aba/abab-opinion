@@ -205,17 +205,44 @@ async def trends_detail(
     return ok(data)
 
 
-@router.get("/{task_id}/tracking-status", summary="追踪状态（占位）")
+@router.get("/{task_id}/tracking-status", summary="追踪状态")
 async def tracking_status(
     task_id: str,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """追踪状态 — 暂未实现，返回无追踪。"""
-    await _get_task(task_id, current_user, db)
+    """查询分析任务是否已关联追踪任务及其状态。
+
+    Returns:
+        {is_tracking: bool, new_comments: int, total_comments: int, credits_remaining: int}
+    """
+    from sqlalchemy import select
+    from backend.models.tracking_task import TrackingTask, TrackingStatus
+
+    task = await _get_task(task_id, current_user, db)
+
+    result = await db.execute(
+        select(TrackingTask).where(
+            TrackingTask.analysis_task_id == task_id,
+        ).order_by(TrackingTask.started_at.desc()).limit(1)
+    )
+    tracking = result.scalar_one_or_none()
+
+    if not tracking:
+        return ok({
+            "is_tracking": False,
+            "tracking_id": None,
+            "new_comments": 0,
+            "total_comments": task.total_comments_processed or 0,
+            "credits_remaining": 0,
+        })
+
+    user = await db.get(User, current_user.id) if hasattr(User, 'credits') else None
+
     return ok({
-        "is_tracking": False,
-        "new_comments": 0,
-        "total_comments": 0,
-        "credits_remaining": 0,
+        "is_tracking": tracking.status == TrackingStatus.active,
+        "tracking_id": tracking.id,
+        "new_comments": tracking.new_comments_since_start or 0,
+        "total_comments": task.total_comments_processed or 0,
+        "credits_remaining": user.credits if user else 0,
     })
