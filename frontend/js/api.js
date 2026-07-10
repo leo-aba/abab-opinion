@@ -131,6 +131,24 @@ const api = {
    */
   register(username, email, password, confirmPassword) { return post('/auth/register', { username, email, password, confirm_password: confirmPassword }); },
 
+  /**
+   * 找回密码：发送重置链接到邮箱
+   * @param {string} email - 注册邮箱
+   * @returns {Promise<null>}
+   */
+  sendResetCode(username, email) { return post('/auth/send-reset-code', { username: username, email: email }); },
+
+  /**
+   * 重置密码：验证验证码并设置新密码
+   * @param {string} username        - 用户名
+   * @param {string} code            - 验证码
+   * @param {string} password        - 新密码
+   * @param {string} confirmPassword  - 确认新密码
+   * @returns {Promise<null>}
+   */
+  resetPassword(username, code, password, confirmPassword) { return post('/auth/reset-password', { username: username, code: code, password: password, confirm_password: confirmPassword }); },
+
+
   // ============================
   // Dashboard
   // ============================
@@ -312,6 +330,20 @@ const api = {
     const q = qs.toString();
     return get('/history' + (q ? '?' + q : ''));
   },
+
+  /**
+   * 删除单条历史记录
+   * @param {string} taskId - 分析任务 ID
+   * @returns {Promise<{task_id: string}>}
+   */
+  deleteHistory(taskId) { return request('DELETE', '/history/' + taskId); },
+
+  /**
+   * 批量删除历史记录
+   * @param {string[]} taskIds - 要删除的任务 ID 列表
+   * @returns {Promise<{deleted_count: number, failed_count: number}>}
+   */
+  batchDeleteHistory(taskIds) { return post('/history/batch-delete', { task_ids: taskIds }); },
 
   // ============================
   // 系统设置

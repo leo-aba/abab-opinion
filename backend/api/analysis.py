@@ -53,6 +53,7 @@ async def create_analysis(
             comment_count=body.comment_count,
             time_range=body.time_range,
             language=body.language,
+            analysis_method=body.analysis_method,
             background_tasks=background_tasks,
         )
         logger.info(
@@ -92,13 +93,13 @@ async def get_task_progress(
 
     # 映射状态到前端 steps
     status = task.status.value if hasattr(task.status, 'value') else task.status
-    steps = _build_steps(status, task.progress_pct)
+    steps = _build_steps(status, task.progress_pct, task.analysis_method or "llm")
 
     # 构建 overall_hint
-    hint = _build_hint(status, task.progress_pct, task.total_comments_processed, task.comment_limit)
+    hint = _build_hint(status, task.progress_pct, task.total_comments_processed, task.comment_limit, task.analysis_method or "llm")
 
     # 构建日志
-    logs = _build_logs(status, task)
+    logs = _build_logs(status, task, task.analysis_method or "llm")
 
     return ok({
         "overall_pct": task.progress_pct,
@@ -109,16 +110,16 @@ async def get_task_progress(
     })
 
 
-def _build_steps(status: str, progress_pct: int) -> list[dict]:
+def _build_steps(status: str, progress_pct: int, analysis_method: str = "llm") -> list[dict]:
     """根据任务状态构建 pipeline 步骤列表"""
-    # 步骤定义
+    step6_name = "话题聚类" if analysis_method == "cluster" else "AI 总结"
     step_defs = [
         (1, "抓取评论"),
         (2, "清洗数据"),
         (3, "向量化"),
         (4, "聚类分析"),
         (5, "Topic 生成"),
-        (6, "AI 总结"),
+        (6, step6_name),
     ]
 
     # 已完成步骤数（基于 status 和 progress_pct）
@@ -164,7 +165,7 @@ def _build_steps(status: str, progress_pct: int) -> list[dict]:
     return steps
 
 
-def _build_hint(status: str, progress_pct: int, processed: int, limit: int) -> str:
+def _build_hint(status: str, progress_pct: int, processed: int, limit: int, analysis_method: str = "llm") -> str:
     """构建进度提示文案"""
     if status == "queued":
         return "任务已创建，等待调度..."
@@ -176,6 +177,8 @@ def _build_hint(status: str, progress_pct: int, processed: int, limit: int) -> s
     elif status == "cleaning":
         return "正在清洗评论数据..."
     elif status == "summarizing":
+        if analysis_method == "cluster":
+            return "正在进行向量化与聚类分析，生成话题..."
         return "正在进行 AI 分析，生成话题与综述..."
     elif status == "completed":
         return "分析完成！"
@@ -185,7 +188,7 @@ def _build_hint(status: str, progress_pct: int, processed: int, limit: int) -> s
         return f"处理中... ({progress_pct}%)"
 
 
-def _build_logs(status: str, task: AnalysisTask) -> list[dict]:
+def _build_logs(status: str, task: AnalysisTask, analysis_method: str = "llm") -> list[dict]:
     """构建进度日志"""
     import datetime
     now = datetime.datetime.now().strftime("%H:%M:%S")
@@ -202,7 +205,10 @@ def _build_logs(status: str, task: AnalysisTask) -> list[dict]:
         logs.append({"time": now, "message": "正在清洗评论数据...", "type": "info"})
 
     if status == "summarizing":
-        logs.append({"time": now, "message": "正在进行 AI 分析（话题分类、情感分析、生成综述）...", "type": "info"})
+        if analysis_method == "cluster":
+            logs.append({"time": now, "message": "正在进行向量化与聚类分析（嵌入、降维、聚类、话题生成）...", "type": "info"})
+        else:
+            logs.append({"time": now, "message": "正在进行 AI 分析（话题分类、情感分析、生成综述）...", "type": "info"})
 
     if status == "completed":
         # 如果 error_message 中包含清洗统计和 AI 综述，则附加展示
@@ -222,7 +228,8 @@ def _build_logs(status: str, task: AnalysisTask) -> list[dict]:
             except (json.JSONDecodeError, KeyError):
                 pass
         if task.topic_count > 0:
-            logs.append({"time": now, "message": f"共识别 {task.topic_count} 个话题", "type": "success"})
+            method_label = "聚类" if analysis_method == "cluster" else "AI"
+            logs.append({"time": now, "message": f"{method_label}分析共识别 {task.topic_count} 个话题", "type": "success"})
         logs.append({"time": now, "message": "分析任务全部完成", "type": "success"})
 
     if status == "failed" and task.error_message:
@@ -322,8 +329,8 @@ async def stream_analysis_progress(
                 pct = fresh.progress_pct
 
                 # ── progress event ──
-                steps = _build_steps(status, pct)
-                hint = _build_hint(status, pct, fresh.total_comments_processed, fresh.comment_limit)
+                steps = _build_steps(status, pct, fresh.analysis_method or "llm")
+                hint = _build_hint(status, pct, fresh.total_comments_processed, fresh.comment_limit, fresh.analysis_method or "llm")
                 progress_data = {
                     "overall_pct": pct,
                     "overall_hint": hint,

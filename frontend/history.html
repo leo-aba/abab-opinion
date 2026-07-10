@@ -8,6 +8,68 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="css/style.css">
+<style>
+/* ── 确认弹窗 ── */
+.modal-overlay {
+  display: none;
+  position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0,0,0,0.6);
+  z-index: 1000;
+  align-items: center; justify-content: center;
+}
+.modal-overlay.show { display: flex; }
+.modal-box {
+  background: #1a1a1a;
+  border: 1px solid #333;
+  border-radius: 16px;
+  padding: 32px;
+  max-width: 420px;
+  width: 90%;
+  text-align: center;
+}
+.modal-box h3 { margin: 0 0 12px; font-size: 18px; color: var(--cream); }
+.modal-box p { margin: 0 0 24px; font-size: 14px; color: #BFB59E; line-height: 1.6; }
+.modal-actions { display: flex; gap: 12px; justify-content: center; }
+.modal-actions .btn { min-width: 100px; padding: 10px 24px; font-size: 14px; border-radius: 8px; cursor: pointer; border: none; font-weight: 600; }
+.modal-actions .btn-cancel { background: #333; color: var(--cream); }
+.modal-actions .btn-cancel:hover { background: #444; }
+.modal-actions .btn-danger { background: #d32f2f; color: #fff; }
+.modal-actions .btn-danger:hover { background: #b71c1c; }
+
+/* ── 复选框列 ── */
+th.checkbox-col, td.checkbox-col { width: 40px; text-align: center; }
+th.checkbox-col input[type="checkbox"], td.checkbox-col input[type="checkbox"] {
+  width: 16px; height: 16px; cursor: pointer; accent-color: var(--orange);
+}
+
+/* ── 批量操作栏 ── */
+.batch-bar {
+  display: none;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  background: #1a1a1a;
+  border: 1px solid #333;
+  border-radius: 10px;
+  margin-bottom: 16px;
+}
+.batch-bar.show { display: flex; }
+.batch-bar .count { font-size: 14px; color: var(--cream); }
+.batch-bar .btn-danger {
+  background: #d32f2f; color: #fff; border: none; border-radius: 8px;
+  padding: 8px 18px; font-size: 13px; font-weight: 600; cursor: pointer;
+}
+.batch-bar .btn-danger:hover { background: #b71c1c; }
+
+/* ── 删除按钮（操作列） ── */
+.btn-delete {
+  background: none; border: 1px solid #555; color: #BFB59E;
+  padding: 4px 12px; border-radius: 6px; font-size: 12px; cursor: pointer;
+  transition: all 0.15s;
+}
+.btn-delete:hover { border-color: #d32f2f; color: #d32f2f; background: rgba(211,47,47,0.1); }
+.btn-sm { margin-right: 6px; }
+</style>
 </head>
 <body>
 
@@ -51,9 +113,17 @@
         <input type="text" id="filter-keyword" placeholder="搜索视频标题...">
         <button class="btn" style="background:var(--orange);color:var(--cream);font-size:13px;padding:8px 16px;" onclick="loadHistory(1)">筛选</button>
       </div>
+
+      <!-- 批量操作栏 -->
+      <div class="batch-bar" id="batch-bar">
+        <span class="count">已选择 <strong id="selected-count">0</strong> 项</span>
+        <button class="btn-danger" onclick="confirmBatchDelete()">删除选中</button>
+      </div>
+
       <table class="data-table">
         <thead>
           <tr>
+            <th class="checkbox-col"><input type="checkbox" id="select-all" onchange="toggleSelectAll(this.checked)"></th>
             <th>视频 <span class="sort-arrow">&#x2195;</span></th>
             <th>平台 · 模式</th>
             <th>Topic数 <span class="sort-arrow">&#x2195;</span></th>
@@ -69,11 +139,25 @@
   </div>
 </div>
 
-<script src="js/api.js"></script>
-<script src="js/common.js"></script>
+<!-- 确认弹窗 -->
+<div class="modal-overlay" id="confirm-modal">
+  <div class="modal-box">
+    <h3 id="modal-title">确认删除</h3>
+    <p id="modal-message">确定要删除选中的历史记录吗？此操作不可撤销。</p>
+    <div class="modal-actions">
+      <button class="btn btn-cancel" onclick="closeModal()">取消</button>
+      <button class="btn btn-danger" id="modal-confirm-btn" onclick="executeDelete()">删除</button>
+    </div>
+  </div>
+</div>
+
+<script src="js/api.js?v=2"></script>
+<script src="js/common.js?v=2"></script>
 <script>
 let currentPage = 1;
 let totalPages = 1;
+let deleteMode = null;   // 'single' | 'batch'
+let deleteTarget = null; // taskId (single) | null (batch)
 
 /** 加载历史记录列表（支持筛选、排序、分页） */
 async function loadHistory(page) {
@@ -100,8 +184,9 @@ async function loadHistory(page) {
         totalPages = data.total_pages || 1;
 
         if (!data.items || data.items.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:40px;color:var(--text-secondary);">暂无历史记录</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:40px;color:var(--text-secondary);">暂无历史记录</td></tr>';
             pagination.innerHTML = '';
+            updateBatchBar();
             return;
         }
 
@@ -121,15 +206,23 @@ async function loadHistory(page) {
 
             html += `
             <tr>
+                <td class="checkbox-col"><input type="checkbox" class="row-checkbox" value="${encodeURIComponent(item.task_id)}" onchange="onRowCheckChange()"></td>
                 <td style="font-weight:500;">${escapeHtml(item.video_title)}</td>
                 <td>${platformBadge} ${modeTag}</td>
                 <td>${item.topic_count || 0}</td>
                 <td>${(item.comment_count || 0).toLocaleString()}</td>
                 <td style="font-size:12px;color:#BFB59E;">${escapeHtml(item.created_at || '—')}${statusText ? ' · ' + escapeHtml(statusText) : ''}</td>
-                <td><a href="results.html?task_id=${encodeURIComponent(item.task_id)}" class="btn-sm">查看结果</a></td>
+                <td>
+                    <a href="results.html?task_id=${encodeURIComponent(item.task_id)}" class="btn-sm">查看结果</a>
+                    <button class="btn-delete" onclick="confirmSingleDelete('${encodeURIComponent(item.task_id)}')">删除</button>
+                </td>
             </tr>`;
         }
         tbody.innerHTML = html;
+
+        // 重置"全选"状态
+        document.getElementById('select-all').checked = false;
+        updateBatchBar();
 
         // 渲染分页导航
         renderPagination(pagination);
@@ -178,6 +271,110 @@ function escapeHtml(str) {
     const div = document.createElement('div');
     div.textContent = str;
     return div.innerHTML;
+}
+
+// ====================================
+// 复选框 & 批量删除逻辑
+// ====================================
+
+/** 获取所有选中行的 task_id 数组 */
+function getSelectedTaskIds() {
+    const ids = [];
+    document.querySelectorAll('.row-checkbox:checked').forEach(cb => {
+        ids.push(decodeURIComponent(cb.value));
+    });
+    return ids;
+}
+
+/** 全选/取消全选 */
+function toggleSelectAll(checked) {
+    document.querySelectorAll('.row-checkbox').forEach(cb => cb.checked = checked);
+    updateBatchBar();
+}
+
+/** 行复选框变化时更新批量操作栏 */
+function onRowCheckChange() {
+    // 如果任意行取消选中，取消"全选"
+    if (!document.querySelectorAll('.row-checkbox:checked').length) {
+        document.getElementById('select-all').checked = false;
+    } else {
+        // 所有行都选中时勾上全选
+        const all = document.querySelectorAll('.row-checkbox');
+        const checked = document.querySelectorAll('.row-checkbox:checked');
+        document.getElementById('select-all').checked = all.length === checked.length;
+    }
+    updateBatchBar();
+}
+
+/** 更新批量操作栏的显示 */
+function updateBatchBar() {
+    const ids = getSelectedTaskIds();
+    const bar = document.getElementById('batch-bar');
+    if (ids.length > 0) {
+        bar.classList.add('show');
+        document.getElementById('selected-count').textContent = ids.length;
+    } else {
+        bar.classList.remove('show');
+    }
+}
+
+// ====================================
+// 删除确认弹窗
+// ====================================
+
+/** 确认单条删除 */
+function confirmSingleDelete(taskIdEncoded) {
+    const taskId = decodeURIComponent(taskIdEncoded);
+    deleteMode = 'single';
+    deleteTarget = taskId;
+    document.getElementById('modal-title').textContent = '确认删除';
+    document.getElementById('modal-message').textContent = '确定要删除此历史记录吗？关联的评论和话题数据将被永久删除，此操作不可撤销。';
+    document.getElementById('confirm-modal').classList.add('show');
+}
+
+/** 确认批量删除 */
+function confirmBatchDelete() {
+    const ids = getSelectedTaskIds();
+    if (ids.length === 0) return;
+    deleteMode = 'batch';
+    deleteTarget = null;
+    document.getElementById('modal-title').textContent = '批量删除';
+    document.getElementById('modal-message').textContent = '确定要删除选中的 ' + ids.length + ' 条历史记录吗？关联的评论和话题数据将被永久删除，此操作不可撤销。';
+    document.getElementById('confirm-modal').classList.add('show');
+}
+
+/** 关闭弹窗 */
+function closeModal() {
+    document.getElementById('confirm-modal').classList.remove('show');
+    deleteMode = null;
+    deleteTarget = null;
+}
+
+/** 执行删除 */
+async function executeDelete() {
+    const btn = document.getElementById('modal-confirm-btn');
+    btn.disabled = true;
+    btn.textContent = '删除中...';
+
+    try {
+        if (deleteMode === 'single') {
+            await api.deleteHistory(deleteTarget);
+        } else if (deleteMode === 'batch') {
+            const ids = getSelectedTaskIds();
+            if (ids.length > 0) {
+                await api.batchDeleteHistory(ids);
+            }
+        }
+
+        closeModal();
+        // 刷新当前页
+        loadHistory(currentPage);
+    } catch (e) {
+        alert('删除失败: ' + e.message);
+    } finally {
+        btn.disabled = false;
+        btn.textContent = '删除';
+    }
 }
 
 // 初始化：加载用户信息后获取历史记录第 1 页

@@ -23,6 +23,7 @@ from backend.service.video_service import (
 from backend.service.comment_service import batch_upsert_comments, delete_comments_by_video
 from backend.service.comment_cleaner import clean_comments
 from backend.service.llm_service import analyze_comments_with_llm
+from backend.service.embed_cluster_service import analyze_comments as analyze_comments_cluster
 from backend.models.comment import Comment
 from backend.models.topic import Topic
 
@@ -51,6 +52,7 @@ async def run_crawl_task(
     platform: str,
     platform_video_id: str,
     comment_limit: int,
+    analysis_method: str = "llm",
 ) -> None:
     """后台爬取任务：在独立 DB session 中执行，更新任务状态。
 
@@ -211,6 +213,16 @@ async def run_crawl_task(
             overall_summary = ""
 
             if db_comments:
+                # 根据 analysis_method 分流: llm → DeepSeek, cluster → 本地嵌入+聚类
+                if analysis_method == "cluster":
+                    comments_for_analysis = [{"text": c.text} for c in db_comments]
+                    cluster_result = await asyncio.to_thread(analyze_comments_cluster, comments_for_analysis)
+                    topics_data = cluster_result.get("topics", [])
+                    overall_summary = cluster_result.get("overall_summary", "")
+                    aspects = cluster_result.get("aspects", [])
+                    logger.info("聚类分析完成: %d 个话题, 综述 %d 字", len(topics_data), len(overall_summary))
+                else:
+                    comments_for_llm = [{"text": c.text} for c in db_comments]
                 comments_for_llm = [{"text": c.text} for c in db_comments]
 
                 # 后台脉冲更新进度（LLM 调用期间从 88% → 98%，每 4s 涨 2%）
@@ -329,6 +341,7 @@ async def create_analysis_task(
     comment_count: int,
     time_range: str,
     language: str,
+    analysis_method: str = "llm",
     background_tasks: BackgroundTasks | None = None,
 ) -> AnalysisTask:
     """创建分析任务。
@@ -376,6 +389,7 @@ async def create_analysis_task(
         time_range=_map_time_range(time_range),
         language_filter=LanguageFilter(lang),
         status=AnalysisStatus.queued,
+        analysis_method=analysis_method,
     )
     db.add(task)
     await db.flush()
@@ -389,6 +403,7 @@ async def create_analysis_task(
             platform=platform,
             platform_video_id=platform_video_id,
             comment_limit=comment_count,
+            analysis_method=analysis_method,
         )
 
     # 提前提交事务，确保后台任务能在独立 session 中查到该记录

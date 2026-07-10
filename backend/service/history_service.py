@@ -1,13 +1,15 @@
-"""历史记录 Service — 查询当前用户的分析任务历史列表"""
+"""历史记录 Service — 查询 / 删除当前用户的分析任务历史"""
 
 import logging
 import math
 from datetime import datetime, timedelta
 
-from sqlalchemy import select, func
+from sqlalchemy import select, func, delete
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.models.analysis_task import AnalysisTask, AnalysisStatus, AnalysisMode
+from backend.models.comment import Comment
+from backend.models.topic import Topic
 from backend.models.video import Video
 
 logger = logging.getLogger("history_service")
@@ -85,6 +87,7 @@ async def get_history_items(
         AnalysisTask.completed_at.label("analyzed_at"),
         AnalysisTask.created_at.label("created_at"),
         AnalysisTask.status,
+        AnalysisTask.analysis_method,
     ]
 
     base_stmt = (
@@ -143,6 +146,7 @@ async def get_history_items(
             "video_title": row.video_title or "",
             "platform": row.platform if isinstance(row.platform, str) else "",
             "analysis_mode": row_mode.value if hasattr(row_mode, "value") else str(row_mode),
+            "analysis_method": row.analysis_method or "llm",
             "topic_count": row.topic_count or 0,
             "comment_count": row.comment_count or 0,
             "analyzed_at": row.analyzed_at.strftime("%Y-%m-%d %H:%M") if row.analyzed_at else "",
@@ -160,3 +164,66 @@ async def get_history_items(
         "page_size": page_size,
         "items": items,
     }
+
+
+async def delete_history_task(db: AsyncSession, task_id: str, user_id: str) -> bool:
+    """删除单条历史分析记录（含关联的评论和话题）。
+
+    逻辑顺序：
+    1. 校验任务属于当前用户且为终端状态
+    2. 删除该任务关联的评论
+    3. 话题表设置了 FK CASCADE，删除任务时自动删除
+    4. 删除任务记录
+    5. 注意：不删除 Video 记录（可能被其他任务共享）
+
+    Returns:
+        True 删除成功；False 任务不存在或无权删除
+    """
+    task = await db.get(AnalysisTask, task_id)
+    if not task or task.user_id != user_id:
+        return False
+
+    # 不允许删除进行中的任务
+    if task.status not in (AnalysisStatus.completed, AnalysisStatus.failed):
+        logger.warning("尝试删除非终端状态任务 %s (status=%s)", task_id, task.status)
+        return False
+
+    # 删除该任务关联的评论
+    await db.execute(
+        delete(Comment).where(Comment.task_id == task_id)
+    )
+
+    # 删除任务（CASCADE 会自动删除 topics）
+    await db.delete(task)
+    await db.commit()
+
+    logger.info("用户 %s 删除了历史记录 %s", user_id, task_id)
+    return True
+
+
+async def batch_delete_history(db: AsyncSession, task_ids: list[str], user_id: str) -> dict:
+    """批量删除历史分析记录。
+
+    Args:
+        task_ids: 要删除的任务 ID 列表
+        user_id: 当前用户 ID
+
+    Returns:
+        {deleted_count: int, failed_count: int}
+    """
+    deleted = 0
+    failed = 0
+
+    for task_id in task_ids:
+        try:
+            ok = await delete_history_task(db, task_id, user_id)
+            if ok:
+                deleted += 1
+            else:
+                failed += 1
+        except Exception as e:
+            logger.error("批量删除任务 %s 失败: %s", task_id, e)
+            failed += 1
+            await db.rollback()
+
+    return {"deleted_count": deleted, "failed_count": failed}

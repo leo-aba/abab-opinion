@@ -43,3 +43,13 @@ CORS_ORIGINS = os.getenv("CORS_ORIGINS", "http://localhost:5173,http://localhost
 DEEPSEEK_API_KEY = os.getenv("DEEPSEEK_API_KEY", "")
 DEEPSEEK_BASE_URL = os.getenv("DEEPSEEK_BASE_URL", "https://api.deepseek.com")
 DEEPSEEK_MODEL = os.getenv("DEEPSEEK_MODEL", "deepseek-chat")
+
+# ============================================================
+# 阿里云邮件推送 — 找回密码
+# ============================================================
+ALIYUN_ACCESS_KEY_ID = os.getenv("ALIYUN_ACCESS_KEY_ID", "")
+ALIYUN_ACCESS_KEY_SECRET = os.getenv("ALIYUN_ACCESS_KEY_SECRET", "")
+ALIYUN_ACCOUNT_NAME = os.getenv("ALIYUN_ACCOUNT_NAME", "")
+ALIYUN_REGION = os.getenv("ALIYUN_REGION", "cn-hangzhou")
+# 前端找回密码页面的基 URL（用于生成重置链接）
+RESET_PASSWORD_BASE_URL = os.getenv("RESET_PASSWORD_BASE_URL", "http://localhost:8000")

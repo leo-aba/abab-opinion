@@ -323,10 +323,10 @@ def _create_douyin_driver():
 
 
 def _douyin_init_session(driver) -> None:
-    """初始化抖音浏览器会话：访问首页获取 Cookie，再访问视频页"""
+    """初始化抖音浏览器会话：访问首页获取 Cookie"""
     import time
     driver.get("https://www.douyin.com/")
-    time.sleep(3)
+    time.sleep(1.5)
 
 
 def _douyin_js_fetch(driver, url: str) -> dict:
@@ -382,7 +382,7 @@ async def fetch_douyin_video_info(video_id: str) -> dict | None:
 
         # 访问视频页面让浏览器建立 Referer 上下文
         driver.get(f"https://www.douyin.com/video/{video_id}")
-        time.sleep(3)
+        time.sleep(1.5)
 
         data = await asyncio.to_thread(_douyin_js_fetch, driver, api_url)
 
@@ -554,7 +554,7 @@ async def upsert_video(db: AsyncSession, info: dict) -> Video:
 # ──────────────────────────────────────────────
 
 async def search_video_by_url(query: str, db: AsyncSession) -> list[dict]:
-    """根据 URL 搜索视频：始终实时调用平台 API，再 upsert 到数据库。
+    """根据 URL 搜索视频：优先查数据库缓存，无记录时实时调用平台 API。
 
     返回前端期望的格式:
         [{video_id, title, cover_url, uploader, comment_count}]
@@ -566,7 +566,13 @@ async def search_video_by_url(query: str, db: AsyncSession) -> list[dict]:
     # 1) 解析 URL → platform + video_id
     platform, video_id = parse_video_url(query)
 
-    # 2) 实时调用平台 API 获取最新数据
+    # 2) 优先查数据库 — 已有记录则直接返回（避免慢速 API 调用）
+    existing = await find_video_by_platform_id(db, platform, video_id)
+    if existing:
+        logger.info("数据库命中: platform=%s, id=%s, title=%s", platform, video_id, existing.title[:40])
+        return [_video_to_search_item(existing)]
+
+    # 3) 数据库无记录 → 实时调用平台 API
     logger.info("实时抓取: platform=%s, id=%s", platform, video_id)
 
     if platform == Platform.bilibili.value:
@@ -579,7 +585,7 @@ async def search_video_by_url(query: str, db: AsyncSession) -> list[dict]:
     if info is None:
         raise RuntimeError("获取视频信息失败，请检查链接是否正确")
 
-    # 3) upsert 到数据库（已有则更新，没有则插入）
+    # 4) upsert 到数据库
     video = await upsert_video(db, info)
 
     return [_video_to_search_item(video)]
@@ -629,6 +635,8 @@ async def get_video_list(
         Video.id.label("video_id"),
         Video.title,
         Video.cover_url,
+        Video.url,
+        Video.platform_video_id,
         Video.platform,
         Video.uploader_name.label("author"),
         Video.comment_count,
@@ -688,6 +696,8 @@ async def get_video_list(
             "task_id": latest_task_map.get(row.video_id, ""),
             "title": row.title or "",
             "cover_url": row.cover_url or "",
+            "url": row.url or "",
+            "platform_video_id": row.platform_video_id or "",
             "platform": row.platform.value if hasattr(row.platform, "value") else str(row.platform),
             "author": row.author or "",
             "comment_count": row.comment_count or 0,

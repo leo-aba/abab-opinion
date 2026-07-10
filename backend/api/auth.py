@@ -15,9 +15,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from backend.database import get_db
 from backend.dependencies import get_current_user
 from backend.models.user import User
-from backend.schemas.auth import LoginRequest, RegisterRequest
+from backend.schemas.auth import LoginRequest, RegisterRequest, SendResetCodeRequest, VerifyResetCodeRequest
 from backend.schemas.common import ok
 from backend.service.auth_service import hash_password, verify_password, create_access_token
+from backend.service.email_service import send_email
 
 logger = logging.getLogger("auth")
 
@@ -97,6 +98,109 @@ async def register(body: RegisterRequest, db: AsyncSession = Depends(get_db)):
     logger.info('新用户"%s"注册成功', body.username)
     return ok(None, "注册成功")
 
+
+# 内存中存储验证码: {email: {code, expires_at, sent_at, user_id}}
+_reset_codes: dict[str, dict] = {}
+
+
+@router.post("/send-reset-code")
+async def send_reset_code(
+    body: SendResetCodeRequest,
+    db: AsyncSession = Depends(get_db),
+):
+    import time
+    import random
+
+    # 根据用户名查找用户，并校验邮箱匹配
+    result = await db.execute(select(User).where(User.username == body.username))
+    user = result.scalar_one_or_none()
+
+    if not user or not user.email:
+        logger.warning("发送验证码: 用户名 %s 不存在或未绑定邮箱", body.username)
+        raise HTTPException(status_code=400, detail="用户名或邮箱不正确")
+
+    if user.email.lower() != body.email.lower().strip():
+        logger.warning("发送验证码: 邮箱不匹配 username=%s, input=%s, db=%s", body.username, body.email, user.email)
+        raise HTTPException(status_code=400, detail="用户名或邮箱不正确")
+
+    email = user.email
+    now = time.time()
+    existing = _reset_codes.get(body.username)
+    if existing and now - existing.get("sent_at", 0) < 60:
+        remaining = int(60 - (now - existing["sent_at"]))
+        raise HTTPException(status_code=429, detail=f"请 {remaining} 秒后再试")
+
+    code = str(random.randint(100000, 999999))
+    _reset_codes[body.username] = {
+        "code": code,
+        "expires_at": now + 600,
+        "sent_at": now,
+        "user_id": user.id,
+    }
+
+    # 脱敏邮箱用于前端显示
+    at_idx = email.find("@")
+    masked_email = email[:3] + "***" + email[at_idx:] if at_idx > 3 else email
+
+    html_body = (
+        f"<h3>密码重置验证码</h3>"
+        f"<p>您好，{user.username}：</p>"
+        f"<p>您正在重置密码，请使用以下验证码（10 分钟内有效）：</p>"
+        f"<p style='font-size:32px;letter-spacing:8px;font-weight:bold;text-align:center;padding:16px;background:#f5f5f5;border-radius:8px;color:#FF7A22;'>{code}</p>"
+        f"<p>如非本人操作，请忽略此邮件。</p>"
+        f"<hr><p style='color:gray;font-size:12px;'>AI Opinion Analytics</p>"
+    )
+
+    ok_result = send_email(
+        to_address=email,
+        subject="【AI Opinion Analytics】密码重置验证码",
+        html_body=html_body,
+    )
+
+    if not ok_result:
+        logger.error("发送验证码: 邮件发送失败 %s", email)
+        raise HTTPException(status_code=502, detail="邮件发送失败，请稍后重试")
+
+    logger.info('验证码已发送至 %s (user=%s)', email, user.username)
+    return ok({"masked_email": masked_email}, "验证码已发送")
+
+
+@router.post("/reset-password")
+async def reset_password(
+    body: VerifyResetCodeRequest,
+    db: AsyncSession = Depends(get_db),
+):
+    import time
+
+    if len(body.password) < 6:
+        raise HTTPException(status_code=422, detail="密码至少需要6位")
+
+    if body.password != body.confirm_password:
+        raise HTTPException(status_code=422, detail="两次密码不一致")
+
+    record = _reset_codes.get(body.username)
+    if not record:
+        raise HTTPException(status_code=400, detail="请先获取验证码")
+
+    now = time.time()
+    if now > record["expires_at"]:
+        _reset_codes.pop(body.username, None)
+        raise HTTPException(status_code=400, detail="验证码已过期，请重新获取")
+
+    if record["code"] != body.code:
+        raise HTTPException(status_code=400, detail="验证码不正确")
+
+    result = await db.execute(select(User).where(User.id == record["user_id"]))
+    user = result.scalar_one_or_none()
+    if not user:
+        raise HTTPException(status_code=404, detail="用户不存在")
+
+    user.password_hash = hash_password(body.password)
+    await db.flush()
+    _reset_codes.pop(body.username, None)
+
+    logger.info('密码已重置: user=%s', user.username)
+    return ok(None, "密码重置成功")
 
 @router.get("/me")
 async def me(current_user: User = Depends(get_current_user)):
