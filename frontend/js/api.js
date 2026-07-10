@@ -131,6 +131,24 @@ const api = {
    */
   register(username, email, password, confirmPassword) { return post('/auth/register', { username, email, password, confirm_password: confirmPassword }); },
 
+  /**
+   * 找回密码：发送重置链接到邮箱
+   * @param {string} email - 注册邮箱
+   * @returns {Promise<null>}
+   */
+  sendResetCode(username, email) { return post('/auth/send-reset-code', { username: username, email: email }); },
+
+  /**
+   * 重置密码：验证验证码并设置新密码
+   * @param {string} username        - 用户名
+   * @param {string} code            - 验证码
+   * @param {string} password        - 新密码
+   * @param {string} confirmPassword  - 确认新密码
+   * @returns {Promise<null>}
+   */
+  resetPassword(username, code, password, confirmPassword) { return post('/auth/reset-password', { username: username, code: code, password: password, confirm_password: confirmPassword }); },
+
+
   // ============================
   // Dashboard
   // ============================
