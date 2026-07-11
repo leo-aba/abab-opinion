@@ -82,7 +82,7 @@
                                     </div>
                                 </div>
                                 <div style="margin-top:16px;display:flex;gap:12px;">
-                                    <button class="btn" style="background:var(--orange);color:var(--cream);font-size:13px;padding:8px 20px;" onclick="window.location.href='results.html'">查看实时结果</button>
+                                    <button class="btn" style="background:var(--orange);color:var(--cream);font-size:13px;padding:8px 20px;" onclick="goToResults()">查看实时结果</button>
                                     <button class="btn-danger-sm" onclick="stopTracking()">停止追踪</button>
                                 </div>
                             </div>
@@ -541,6 +541,13 @@
             cleanupTracking();
         }
 
+        /** 跳转到结果页查看分析结果 */
+        function goToResults() {
+            if (taskId) {
+                window.location.href = 'results.html?task_id=' + encodeURIComponent(taskId);
+            }
+        }
+
         /** 清理追踪状态：清除定时器、隐藏 UI */
         function cleanupTracking() {
             trackingActive = false;
@@ -561,14 +568,19 @@
                 console.error('initPage failed:', err);
             });
 
-            // 2. 从 sessionStorage 读取任务信息
-            taskId = sessionStorage.getItem('analysisTaskId');
-            selectedMode = sessionStorage.getItem('analysisMode') || 'normal';
+            // 2. 从 URL 参数优先读取，回退到 sessionStorage（支持刷新恢复）
+            var urlParams = new URLSearchParams(window.location.search);
+            taskId = urlParams.get('task_id') || sessionStorage.getItem('analysisTaskId');
+            selectedMode = urlParams.get('mode') || sessionStorage.getItem('analysisMode') || 'normal';
+            // 同步写回 sessionStorage
+            if (taskId) sessionStorage.setItem('analysisTaskId', taskId);
+            if (selectedMode) sessionStorage.setItem('analysisMode', selectedMode);
 
             if (!taskId) {
                 document.getElementById('pipelineSteps').innerHTML =
                     '<div style="color:var(--red);padding:20px;text-align:center;">' +
-                    '错误: 未找到分析任务。请从创建分析页面开始。' +
+                    '错误: 未找到分析任务。请从创建分析页面开始。<br>' +
+                    '<a href="create-analysis.html" class="btn" style="background:var(--orange);color:var(--cream);margin-top:16px;display:inline-block;padding:10px 24px;">← 返回创建分析</a>' +
                     '</div>';
                 document.getElementById('progressHint').textContent = '无分析任务';
                 addLog(getTimeStr(), '错误: sessionStorage 中没有 analysisTaskId', 'error');

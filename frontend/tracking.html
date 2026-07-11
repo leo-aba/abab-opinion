@@ -81,10 +81,6 @@ async function loadTrackingTasks() {
 
         let html = '';
         for (const t of tasks) {
-            const logsHtml = (t.recent_logs && t.recent_logs.length > 0)
-                ? t.recent_logs.map(l => `<div>${l.time} ${l.message}</div>`).join('\n')
-                : '<div style="color:var(--text-secondary);">暂无日志</div>';
-
             html += `
             <div class="chart-card" style="margin-bottom:20px;">
                 <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
@@ -117,12 +113,6 @@ async function loadTrackingTasks() {
                     <div style="background:var(--bg);padding:16px;border-radius:8px;text-align:center;">
                         <div style="font-size:24px;font-weight:800;">${formatDuration(t.duration_seconds || 0)}</div>
                         <div style="font-size:11px;color:var(--text-secondary);margin-top:4px;">运行时间</div>
-                    </div>
-                </div>
-                <div style="margin-top:16px;padding:14px 18px;background:var(--bg);border-radius:8px;">
-                    <h4 style="font-size:13px;font-weight:600;margin-bottom:8px;color:var(--cream);">最新追踪日志</h4>
-                    <div style="font-family:monospace;font-size:11px;color:var(--text-secondary);line-height:1.8;">
-                        ${logsHtml}
                     </div>
                 </div>
             </div>`;

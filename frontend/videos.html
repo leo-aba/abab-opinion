@@ -79,9 +79,7 @@ async function loadVideos() {
                 : '';
 
             const videoUrl = v.url || buildVideoUrl(v.platform, v.platform_video_id) || '';
-            const cardOnClick = v.status === 'pending' && videoUrl
-                ? "goToCreateAnalysis('" + videoUrl + "')"
-                : "goToResults('" + (v.task_id || v.video_id) + "')";
+            const cardOnClick = getCardOnClick(v);
             html += `
             <div class="video-card" onclick="${cardOnClick}">
                 <div class="video-card-cover" style="background:var(--cover-bg, #111);overflow:hidden;">
@@ -144,11 +142,32 @@ function buildVideoUrl(platform, platformVideoId) {
   return '';
 }
 
+/** 根据视频分析状态决定点击跳转目标 */
+function getCardOnClick(v) {
+    const videoUrl = v.url || buildVideoUrl(v.platform, v.platform_video_id) || '';
+    if (v.status === 'pending' && videoUrl) {
+        return "goToCreateAnalysis('" + encodeURIComponent(videoUrl) + "')";
+    }
+    if (v.status === 'analyzing') {
+        return "goToPipeline('" + (v.task_id || '') + "')";
+    }
+    if (v.task_id) {
+        return "goToResults('" + encodeURIComponent(v.task_id) + "')";
+    }
+    return '';
+}
+
 /** 跳转到创建分析页面（带视频URL） */
 function goToCreateAnalysis(url) { window.location.href = 'create-analysis.html?url=' + encodeURIComponent(url); }
 
 /** 跳转到分析结果页面 */
 function goToResults(taskId) { window.location.href = 'results.html?task_id=' + encodeURIComponent(taskId); }
+
+/** 跳转到实时分析 Pipeline 页面 */
+function goToPipeline(taskId) {
+    if (taskId) sessionStorage.setItem('analysisTaskId', taskId);
+    window.location.href = 'pipeline.html?task_id=' + encodeURIComponent(taskId);
+}
 
 /** 防 XSS 的 HTML 转义 */
 function escapeHtml(str) {

@@ -418,6 +418,7 @@ async def create_analysis_task(
         analysis_method=analysis_method,
     )
     db.add(task)
+    video.analysis_status = "analyzing"  # 标记视频为分析中
     await db.flush()
 
     # 4) 注册后台爬取任务

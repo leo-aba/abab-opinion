@@ -85,7 +85,7 @@
                         </div>
                     </div>
                     <div class="flex gap-4">
-                        <button class="btn-sm" onclick="window.location.href='pipeline.html'">刷新数据</button>
+                        <button class="btn-sm" onclick="location.reload()">刷新数据</button>
                         <button class="btn-danger-sm" id="btn-stop-tracking" onclick="stopTracking()">停止追踪</button>
                     </div>
                 </div>
@@ -293,13 +293,13 @@
         // 初始化 — 从 URL 取 task_id，加载概览
         // ============================================================
         window.addEventListener('DOMContentLoaded', function() {
-            loadSidebar('results');
+            loadSidebar('history');
             initPage({ loadUser: true, loadHeaderStats: true });
 
             var params = new URLSearchParams(window.location.search);
             currentTaskId = params.get('task_id');
             if (!currentTaskId) {
-                showError('results-loading', '缺少 task_id 参数，请从分析任务列表进入。');
+                document.getElementById('results-loading').innerHTML = '<div style="text-align:center;padding:60px 20px;color:var(--text-secondary-dark);"><div style="font-size:40px;margin-bottom:12px;">📋</div><p style="font-size:15px;font-weight:500;">缺少 task_id 参数</p><p style="font-size:13px;margin-top:4px;">请从 <a href="history.html" style="color:var(--orange);">历史记录</a> 中选择一条任务查看结果。</p></div>';
                 return;
             }
             loadOverview();
@@ -439,6 +439,7 @@
                 setText('tracking-new', '+' + (status.new_comments || 0).toLocaleString());
                 setText('tracking-total', (status.total_comments || 0).toLocaleString());
                 setText('tracking-credits', (status.credits_remaining || 0).toLocaleString());
+                setText('tracking-elapsed', status.duration_formatted || formatDuration(status.duration_seconds || 0));
             } catch (e) {
                 console.error('refreshIfTracking error:', e);
             }
