@@ -173,6 +173,8 @@ CREATE TABLE IF NOT EXISTS tracking_tasks (
     stopped_at              DATETIME    NULL,
     last_poll_at            DATETIME    NULL,
     last_comment_id         VARCHAR(64) NULL,
+    last_analyzed_comment_id VARCHAR(64) NULL COMMENT '上次LLM增量分析过的最新评论cid',
+    last_analyzed_at        DATETIME    NULL COMMENT '上次LLM增量分析时间',
     INDEX idx_tracking_task_id (analysis_task_id),
     INDEX idx_tracking_video_id (video_id),
     INDEX idx_tracking_user_id (user_id),

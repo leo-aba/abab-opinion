@@ -11,6 +11,8 @@ from backend.dependencies import get_current_user
 from backend.models.user import User
 from backend.models.analysis_task import AnalysisTask
 from backend.schemas.common import ok
+from datetime import datetime as dt_datetime
+
 from backend.service.results_service import (
     get_overview,
     get_sentiment_ratio,
@@ -22,6 +24,7 @@ from backend.service.results_service import (
     get_trends_detail,
     get_sentiment_attribute,
 )
+from backend.service.tracking_service import get_tracking_status as _get_ts
 
 logger = logging.getLogger("results_api")
 
@@ -214,7 +217,8 @@ async def tracking_status(
     """查询分析任务是否已关联追踪任务及其状态。
 
     Returns:
-        {is_tracking: bool, new_comments: int, total_comments: int, credits_remaining: int}
+        {is_tracking: bool, tracking_id, new_comments, total_comments, credits_remaining,
+         new_comments_sentiment, new_comments_topics, analyzed_comments, last_analyzed_at}
     """
     from sqlalchemy import select
     from backend.models.tracking_task import TrackingTask, TrackingStatus
@@ -235,9 +239,21 @@ async def tracking_status(
             "new_comments": 0,
             "total_comments": task.total_comments_processed or 0,
             "credits_remaining": 0,
+            "new_comments_sentiment": {"positive": 0, "negative": 0, "neutral": 0},
+            "new_comments_topics": [],
+            "analyzed_comments": 0,
+            "last_analyzed_at": None,
         })
 
+    try:
+        status_data = await _get_ts(tracking.id, db)
+    except ValueError:
+        status_data = {}
+
     user = await db.get(User, current_user.id) if hasattr(User, 'credits') else None
+    duration_seconds = 0
+    if tracking.started_at:
+        duration_seconds = int((dt_datetime.utcnow() - tracking.started_at).total_seconds())
 
     return ok({
         "is_tracking": tracking.status == TrackingStatus.active,
@@ -245,4 +261,9 @@ async def tracking_status(
         "new_comments": tracking.new_comments_since_start or 0,
         "total_comments": task.total_comments_processed or 0,
         "credits_remaining": user.credits if user else 0,
+        "new_comments_sentiment": status_data.get("new_comments_sentiment", {"positive": 0, "negative": 0, "neutral": 0}),
+        "new_comments_topics": status_data.get("new_comments_topics", []),
+        "analyzed_comments": status_data.get("analyzed_comments", 0),
+        "last_analyzed_at": status_data.get("last_analyzed_at"),
+        "duration_seconds": duration_seconds,
     })

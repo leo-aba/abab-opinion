@@ -150,3 +150,131 @@ async def analyze_comments_with_llm(comments: list[dict]) -> dict:
     except Exception as e:
         logger.error("LLM 调用失败: %s", e)
         return {"topics": [], "aspects": [], "overall_summary": ""}
+
+
+# ──────────────────────────────────────────────
+# 增量分类（用于实时追踪模式）
+# ──────────────────────────────────────────────
+
+
+def _build_incremental_classification_prompt(
+    new_comments: list[dict],
+    existing_topics: list[dict],
+) -> str:
+    """构造增量分类 prompt：将新评论归入已有话题并判断逐条情感。
+
+    每条新评论编号 0..N-1，LLM 返回 assignments 数组。
+    """
+    # 格式化已有话题
+    topic_lines = []
+    for t in existing_topics:
+        name = t.get("name", "")
+        keywords = t.get("keywords", [])
+        if isinstance(keywords, list):
+            kw_str = "、".join(keywords)
+        else:
+            kw_str = str(keywords)
+        topic_lines.append(f'- "{name}" [关键词: {kw_str}]')
+
+    topics_text = "\n".join(topic_lines) if topic_lines else "（暂无已有话题）"
+
+    # 格式化新评论
+    comment_lines = []
+    for i, c in enumerate(new_comments):
+        text = c.get("text", "").strip()
+        if not text:
+            continue
+        if len(text) > 200:
+            text = text[:200] + "..."
+        comment_lines.append(f"评论{i}：{text}")
+
+    comments_text = "\n".join(comment_lines)
+
+    prompt = f"""你是一个评论分类助手。以下是已有的评论话题分类和一批新评论。
+
+已有话题：
+{topics_text}
+
+新评论：
+{comments_text}
+
+请将每条新评论分类到最匹配的已有话题中，并判断每条评论的情感倾向。
+- 如果评论不属于任何已有话题，请将其归入"其他"
+- 情感判断标准：positive=正面/赞美/支持，negative=负面/批评/反对，neutral=中性/客观/疑问
+- 每条评论必须恰好有一个分类结果
+
+请严格按以下 JSON 格式返回（只返回 JSON）：
+```json
+{{
+  "assignments": [
+    {{"comment_index": 0, "topic_name": "话题名称", "sentiment": "positive"}},
+    {{"comment_index": 1, "topic_name": "其他", "sentiment": "neutral"}}
+  ]
+}}
+```"""
+    return prompt
+
+
+async def classify_new_comments_with_llm(
+    new_comments: list[dict],
+    existing_topics: list[dict],
+) -> dict:
+    """增量分类：将新评论归入已有话题并判断逐条情感。
+
+    Args:
+        new_comments: 新评论列表，每项至少含 "text" 字段
+        existing_topics: 已有话题列表，每项含 "name"、"keywords"
+
+    Returns:
+        dict: {{"assignments": [{{"comment_index": 0, "topic_name": "...", "sentiment": "positive"}}, ...]}}
+              失败时返回 {{"assignments": []}}
+    """
+    if not new_comments:
+        return {"assignments": []}
+
+    if not DEEPSEEK_API_KEY:
+        logger.error("DEEPSEEK_API_KEY 未配置，跳过增量分类")
+        return {"assignments": []}
+
+    logger.info("开始增量分类: 新评论=%d, 已有话题=%d", len(new_comments), len(existing_topics))
+
+    client = AsyncOpenAI(
+        api_key=DEEPSEEK_API_KEY,
+        base_url=DEEPSEEK_BASE_URL,
+    )
+
+    prompt = _build_incremental_classification_prompt(new_comments, existing_topics)
+
+    try:
+        resp = await client.chat.completions.create(
+            model=DEEPSEEK_MODEL,
+            messages=[
+                {
+                    "role": "system",
+                    "content": "你是一个专业的评论分类助手。请严格按 JSON 格式返回结果，不要附加任何其他文字。",
+                },
+                {
+                    "role": "user",
+                    "content": prompt,
+                },
+            ],
+            temperature=0.3,  # 低温度确保分类一致性
+            response_format={"type": "json_object"},
+            timeout=120,  # 增量分类较快，2 分钟足够
+        )
+
+        raw = resp.choices[0].message.content
+        logger.info("增量分类 LLM 响应长度: %d 字符", len(raw) if raw else 0)
+
+        result = json.loads(raw)
+        assignments = result.get("assignments", [])
+
+        logger.info("增量分类完成: %d 条分配结果", len(assignments))
+        return {"assignments": assignments}
+
+    except json.JSONDecodeError as e:
+        logger.error("增量分类 JSON 解析失败: %s", e)
+        return {"assignments": []}
+    except Exception as e:
+        logger.error("增量分类 LLM 调用失败: %s", e)
+        return {"assignments": []}

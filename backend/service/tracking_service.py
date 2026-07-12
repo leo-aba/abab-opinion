@@ -5,6 +5,7 @@
 """
 
 import asyncio
+import json
 import logging
 import uuid
 from datetime import datetime, timezone, timedelta
@@ -16,6 +17,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from backend.database import get_sessionmaker
 from backend.models.analysis_task import AnalysisTask, AnalysisMode
 from backend.models.tracking_task import TrackingTask, TrackingStatus
+from backend.models.topic import Topic
 from backend.models.video import Video
 from backend.models.comment import Comment
 from backend.models.user import User
@@ -26,6 +28,7 @@ from backend.service.video_service import (
 )
 from backend.service.comment_service import batch_upsert_comments, mark_comments_cleaned
 from backend.service.comment_cleaner import clean_comments
+from backend.service.llm_service import classify_new_comments_with_llm
 
 logger = logging.getLogger("tracking_service")
 
@@ -44,6 +47,14 @@ MAX_POLL_PAGES = 5
 
 # 连续失败次数上限（超过则停止追踪）
 MAX_CONSECUTIVE_FAILURES = 5
+
+# ── LLM 增量分析配置 ──
+
+# 最小分析间隔（秒）
+ANALYSIS_INTERVAL_SECONDS = 60
+
+# 连续 LLM 分析失败上限（超过后继续轮询但不分析）
+MAX_ANALYSIS_FAILURES = 10
 
 
 # ──────────────────────────────────────────────
@@ -160,6 +171,199 @@ async def _fetch_new_douyin_comments(
 
 
 # ──────────────────────────────────────────────
+# 增量 LLM 分析辅助函数
+# ──────────────────────────────────────────────
+
+
+async def _get_unanalyzed_cleaned_comments(
+    db: AsyncSession,
+    video_id: str,
+    last_analyzed_comment_id: str | None,
+) -> list[Comment]:
+    """查询已清洗但尚未 LLM 分析过的评论（按发布时间升序）。
+
+    通过 Comment.sentiment IS NULL 判断未分析，无需依赖游标参数。
+    last_analyzed_comment_id 保留用于未来可能的增量游标优化。
+    """
+    from sqlalchemy import and_
+
+    result = await db.execute(
+        select(Comment)
+        .where(
+            and_(
+                Comment.video_id == video_id,
+                Comment.is_cleaned == True,
+                Comment.sentiment.is_(None),  # 未分析过的评论 sentiment 为 NULL
+            )
+        )
+        .order_by(Comment.create_time.asc())
+        .limit(100)  # 单次最多分析 100 条，防止 LLM 超时
+    )
+    return list(result.scalars().all())
+
+
+async def _get_existing_topics(
+    db: AsyncSession,
+    analysis_task_id: str,
+) -> list[dict]:
+    """获取已有话题列表（name + keywords）。"""
+    result = await db.execute(
+        select(Topic.name, Topic.keywords_json).where(
+            Topic.task_id == analysis_task_id,
+        )
+    )
+    topics = []
+    for row in result.all():
+        keywords = []
+        if row.keywords_json:
+            try:
+                keywords = json.loads(row.keywords_json)
+            except (json.JSONDecodeError, TypeError):
+                pass
+        topics.append({"name": row.name, "keywords": keywords})
+    return topics
+
+
+async def _ensure_other_topic(
+    db: AsyncSession,
+    analysis_task_id: str,
+    video_id: str,
+) -> Topic:
+    """获取或创建「其他」话题。"""
+    result = await db.execute(
+        select(Topic).where(
+            Topic.task_id == analysis_task_id,
+            Topic.name == "其他",
+        )
+    )
+    topic = result.scalar_one_or_none()
+    if topic is None:
+        topic = Topic(
+            id=str(uuid.uuid4()),
+            task_id=analysis_task_id,
+            video_id=video_id,
+            name="其他",
+            comment_count=0,
+            percentage=0.0,
+            keywords_json="[]",
+            ai_summary="追踪期间无法归类到已有话题的新增评论",
+            sentiment_distribution_json=json.dumps({"positive": 0, "negative": 0, "neutral": 0}),
+        )
+        db.add(topic)
+        await db.flush()
+        logger.info("已创建「其他」话题: topic_id=%s", topic.id)
+    return topic
+
+
+async def _apply_classification_results(
+    db: AsyncSession,
+    unanalyzed_comments: list[Comment],
+    llm_result: dict,
+    existing_topics: list[dict],
+    analysis_task_id: str,
+    video_id: str,
+) -> int:
+    """将 LLM 分类结果写回 Comment 和 Topic。
+
+    Args:
+        db: 数据库 session
+        unanalyzed_comments: 未分析的评论 ORM 对象列表
+        llm_result: classify_new_comments_with_llm 返回的 dict
+        existing_topics: 已有话题列表
+        analysis_task_id: 分析任务 ID
+        video_id: 视频 ID
+
+    Returns:
+        int: 成功分类的评论数
+    """
+    assignments = llm_result.get("assignments", [])
+    if not assignments:
+        return 0
+
+    # 1) 建立已有话题名 → Topic ORM 的映射
+    topic_map: dict[str, Topic] = {}
+    for t in existing_topics:
+        name = t.get("name", "")
+        result = await db.execute(
+            select(Topic).where(
+                Topic.task_id == analysis_task_id,
+                Topic.name == name,
+            )
+        )
+        topic = result.scalar_one_or_none()
+        if topic:
+            # 标准化 key（去空格、小写）
+            topic_map[name.strip().lower()] = topic
+            topic_map[name.strip()] = topic
+
+    # 2) 遍历 assignment，逐条更新 Comment 和 Topic
+    classified = 0
+    for assignment in assignments:
+        idx = assignment.get("comment_index", -1)
+        topic_name = assignment.get("topic_name", "其他")
+        sentiment = assignment.get("sentiment", "neutral")
+
+        # 校验 sentiment 合法性
+        if sentiment not in ("positive", "negative", "neutral"):
+            sentiment = "neutral"
+
+        # 校验索引
+        if not isinstance(idx, int) or idx < 0 or idx >= len(unanalyzed_comments):
+            logger.warning("增量分类: 无效 comment_index=%s, 跳过", idx)
+            continue
+
+        comment = unanalyzed_comments[idx]
+
+        # 3) 查找匹配的 Topic
+        topic_name_clean = topic_name.strip()
+        topic = (
+            topic_map.get(topic_name_clean.lower())
+            or topic_map.get(topic_name_clean)
+        )
+
+        if topic is None and topic_name_clean != "其他":
+            # 尝试部分匹配（话题名包含关系）
+            for key, t in topic_map.items():
+                if topic_name_clean in key or key in topic_name_clean:
+                    topic = t
+                    break
+
+        if topic is None:
+            # 归入「其他」
+            topic = await _ensure_other_topic(db, analysis_task_id, video_id)
+
+        # 4) 更新 Comment
+        comment.sentiment = sentiment
+        comment.topic_id = topic.id
+
+        # 5) 增量更新 Topic.sentiment_distribution_json 和 comment_count
+        dist = {"positive": 0, "negative": 0, "neutral": 0}
+        if topic.sentiment_distribution_json:
+            try:
+                dist.update(json.loads(topic.sentiment_distribution_json))
+            except (json.JSONDecodeError, TypeError):
+                pass
+        dist[sentiment] = dist.get(sentiment, 0) + 1
+        topic.sentiment_distribution_json = json.dumps(dist)
+        topic.comment_count = (topic.comment_count or 0) + 1
+
+        classified += 1
+
+    # 6) 重新计算所有 Topic 的 percentage
+    all_topics_result = await db.execute(
+        select(Topic).where(Topic.task_id == analysis_task_id)
+    )
+    all_topics = all_topics_result.scalars().all()
+    total_comments = sum(t.comment_count or 0 for t in all_topics)
+    if total_comments > 0:
+        for t in all_topics:
+            t.percentage = round((t.comment_count or 0) / total_comments * 100, 1)
+
+    logger.info("增量分类写回完成: %d/%d 条已分类", classified, len(assignments))
+    return classified
+
+
+# ──────────────────────────────────────────────
 # 轮询循环
 # ──────────────────────────────────────────────
 
@@ -176,6 +380,7 @@ async def poll_tracking_comments(tracking_id: str) -> None:
     logger.info("追踪轮询启动: tracking_id=%s", tracking_id)
 
     consecutive_failures = 0
+    consecutive_analysis_failures = 0
     sessionmaker = get_sessionmaker()
 
     try:
@@ -296,6 +501,61 @@ async def poll_tracking_comments(tracking_id: str) -> None:
                         consecutive_failures = 0
                         logger.debug("追踪轮询: tracking_id=%s 本轮无新评论", tracking_id)
 
+                    # 7) 条件触发增量 LLM 分析
+                    time_since_last_analysis = float("inf")
+                    if tracking.last_analyzed_at:
+                        time_since_last_analysis = (
+                            now - tracking.last_analyzed_at
+                        ).total_seconds()
+
+                    # 先做廉价的时间判断，通过后再查询 DB
+                    if time_since_last_analysis >= ANALYSIS_INTERVAL_SECONDS and consecutive_analysis_failures < MAX_ANALYSIS_FAILURES:
+                        unanalyzed = await _get_unanalyzed_cleaned_comments(
+                            db, tracking.video_id, tracking.last_analyzed_comment_id,
+                        )
+                        unanalyzed_count = len(unanalyzed)
+
+                        if unanalyzed:
+                            try:
+                                existing_topics = await _get_existing_topics(
+                                    db, analysis_task.id,
+                                )
+                                comments_for_llm = [
+                                    {"text": c.content or ""} for c in unanalyzed
+                                ]
+                                llm_result = await classify_new_comments_with_llm(
+                                    comments_for_llm, existing_topics,
+                                )
+                                if llm_result.get("assignments"):
+                                    await _apply_classification_results(
+                                        db, unanalyzed, llm_result, existing_topics,
+                                        analysis_task.id, tracking.video_id,
+                                    )
+                                    tracking.last_analyzed_comment_id = unanalyzed[-1].platform_comment_id
+                                    tracking.last_analyzed_at = now
+                                    consecutive_analysis_failures = 0
+                                    logger.info(
+                                        "追踪增量分类完成: tracking_id=%s, 已分类=%d 条",
+                                        tracking_id, len(llm_result["assignments"]),
+                                    )
+                                else:
+                                    logger.warning(
+                                        "追踪增量分类: LLM 返回空结果, tracking_id=%s", tracking_id,
+                                    )
+                            except Exception as e:
+                                consecutive_analysis_failures += 1
+                                logger.error(
+                                    "追踪增量分类失败 (tracking_id=%s, 连续失败=%d): %s",
+                                    tracking_id, consecutive_analysis_failures, e, exc_info=True,
+                                )
+                                if consecutive_analysis_failures >= MAX_ANALYSIS_FAILURES:
+                                    logger.error(
+                                        "增量分类连续失败 %d 次，停止分析但继续轮询: tracking_id=%s",
+                                        consecutive_analysis_failures, tracking_id,
+                                    )
+                        else:
+                            logger.debug("追踪增量分类跳过: tracking_id=%s 无未分析评论", tracking_id)
+
                     await db.commit()
 
             except asyncio.CancelledError:
@@ -380,6 +640,7 @@ async def create_tracking_task(
     if row:
         last_cid = row[0]
 
+    now = datetime.utcnow()
     task = TrackingTask(
         id=str(uuid.uuid4()),
         analysis_task_id=analysis_task_id,
@@ -388,8 +649,10 @@ async def create_tracking_task(
         status=TrackingStatus.active,
         poll_interval_seconds=DEFAULT_POLL_INTERVAL,
         credits_rate_per_hour=credits_per_hour,
-        started_at=datetime.utcnow(),
+        started_at=now,
         last_comment_id=last_cid,
+        last_analyzed_comment_id=last_cid,  # 初始分析已覆盖这些评论
+        last_analyzed_at=now,
     )
     db.add(task)
     await db.flush()
@@ -470,7 +733,8 @@ async def get_tracking_status(
     """获取追踪任务当前状态（供 API 端点使用）。
 
     Returns:
-        {active, new_comments, credits_remaining, credits_total, total_comments, total_topics}
+        {active, new_comments, credits_remaining, credits_total, total_comments, total_topics,
+         new_comments_sentiment, new_comments_topics, analyzed_comments, last_analyzed_at}
     """
     tracking = await db.get(TrackingTask, tracking_id)
     if not tracking:
@@ -484,13 +748,66 @@ async def get_tracking_status(
     total_comments = analysis_task.total_comments_processed if analysis_task else 0
     total_topics = analysis_task.topic_count if analysis_task else 0
 
+    # 查询新增评论的情感分布（仅统计追踪期间抓取的评论）
+    from sqlalchemy import func, and_
+
+    sentiment_result = await db.execute(
+        select(
+            Comment.sentiment,
+            func.count(Comment.id).label("cnt"),
+        ).where(
+            and_(
+                Comment.video_id == tracking.video_id,
+                Comment.sentiment.isnot(None),
+                Comment.fetched_at >= tracking.started_at,  # 仅追踪期间
+            )
+        ).group_by(Comment.sentiment)
+    )
+    sentiment_map = {"positive": 0, "negative": 0, "neutral": 0}
+    for row in sentiment_result.all():
+        if row.sentiment in sentiment_map:
+            sentiment_map[row.sentiment] = row.cnt
+
+    # 查询新增评论的话题分布（仅追踪期间）
+    topic_result = await db.execute(
+        select(
+            Topic.name,
+            func.count(Comment.id).label("cnt"),
+        ).join(
+            Comment, Comment.topic_id == Topic.id,
+        ).where(
+            and_(
+                Comment.video_id == tracking.video_id,
+                Comment.sentiment.isnot(None),
+                Comment.fetched_at >= tracking.started_at,
+                Topic.task_id == tracking.analysis_task_id,
+            )
+        ).group_by(Topic.name).order_by(func.count(Comment.id).desc())
+    )
+    new_comments_topics = []
+    total_with_sentiment = sum(sentiment_map.values())
+    for row in topic_result.all():
+        pct = round(row.cnt / total_with_sentiment * 100, 1) if total_with_sentiment > 0 else 0
+        new_comments_topics.append({
+            "topic_name": row.name,
+            "count": row.cnt,
+            "percentage": pct,
+        })
+
+    # 已分析的评论数
+    analyzed_comments = total_with_sentiment
+
     return {
         "active": tracking.status == TrackingStatus.active,
         "new_comments": tracking.new_comments_since_start or 0,
         "credits_remaining": credits_remaining,
-        "credits_total": tracking.credits_rate_per_hour * 24,  # 一天的量作为分母
+        "credits_total": tracking.credits_rate_per_hour * 24,
         "total_comments": total_comments,
         "total_topics": total_topics or 0,
+        "new_comments_sentiment": sentiment_map,
+        "new_comments_topics": new_comments_topics,
+        "analyzed_comments": analyzed_comments,
+        "last_analyzed_at": tracking.last_analyzed_at.isoformat() if tracking.last_analyzed_at else None,
     }
 
 
@@ -512,6 +829,7 @@ async def get_user_active_tracking_tasks(
             TrackingTask.new_comments_since_start,
             TrackingTask.credits_consumed,
             TrackingTask.started_at,
+            TrackingTask.video_id,
             TrackingTask.poll_interval_seconds,
             Video.title.label("video_title"),
             Video.platform,
@@ -534,6 +852,51 @@ async def get_user_active_tracking_tasks(
         duration = 0
         if row.started_at:
             duration = int((now - row.started_at).total_seconds())
+
+        # 查询该追踪任务新增评论的情感分布（仅追踪期间）
+        from sqlalchemy import func, and_ as sa_and
+        video_id = row.video_id
+        tracking_started = row.started_at
+
+        new_sentiment = {"positive": 0, "negative": 0, "neutral": 0}
+        top_topics = []
+        if video_id:
+            sent_result = await db.execute(
+                select(
+                    Comment.sentiment,
+                    func.count(Comment.id).label("cnt"),
+                ).where(
+                    sa_and(
+                        Comment.video_id == video_id,
+                        Comment.sentiment.isnot(None),
+                        Comment.fetched_at >= tracking_started,
+                    )
+                ).group_by(Comment.sentiment)
+            )
+            for sr in sent_result.all():
+                if sr.sentiment in new_sentiment:
+                    new_sentiment[sr.sentiment] = sr.cnt
+
+            # 查询 top 3 话题（仅追踪期间）
+            topic_result = await db.execute(
+                select(
+                    Topic.name,
+                    func.count(Comment.id).label("cnt"),
+                ).join(
+                    Comment, Comment.topic_id == Topic.id,
+                ).where(
+                    sa_and(
+                        Comment.video_id == video_id,
+                        Comment.sentiment.isnot(None),
+                        Comment.fetched_at >= tracking_started,
+                    )
+                ).group_by(Topic.name).order_by(func.count(Comment.id).desc()).limit(3)
+            )
+            top_topics = [
+                {"name": tr.name, "count": tr.cnt}
+                for tr in topic_result.all()
+            ]
+
         items.append({
             "tracking_id": row.tracking_id,
             "task_id": row.task_id,
@@ -548,6 +911,8 @@ async def get_user_active_tracking_tasks(
             "duration_seconds": duration,
             "analysis_finished_at": row.completed_at.isoformat() if row.completed_at else "",
             "recent_logs": [],
+            "new_sentiment": new_sentiment,
+            "top_topics": top_topics,
         })
     return items
 
