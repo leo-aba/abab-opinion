@@ -29,6 +29,44 @@ from backend.models.topic import Topic
 
 logger = logging.getLogger("analysis_service")
 
+
+async def _auto_send_report(task_id: str) -> None:
+    """分析完成后异步发送报告邮件（独立 session，不抛异常）。"""
+    try:
+        from backend.service.report_service import build_report_data, send_report_email
+        from backend.models.user_settings import UserSettings
+        from backend.models.user import User
+        from sqlalchemy import select as sa_select
+
+        async with get_sessionmaker()() as sess:
+            task = await sess.get(AnalysisTask, task_id)
+            if not task:
+                return
+
+            user = await sess.get(User, task.user_id)
+            if not user or not user.email:
+                logger.info("自动发送跳过: 用户无邮箱 (task_id=%s)", task_id)
+                return
+
+            # 检查通知设置
+            settings_result = await sess.execute(
+                sa_select(UserSettings).where(UserSettings.user_id == task.user_id)
+            )
+            us = settings_result.scalar_one_or_none()
+            if us is not None and not us.notify_on_complete:
+                logger.info("自动发送跳过: 用户关闭了通知 (user_id=%s)", task.user_id)
+                return
+
+            report_data = await build_report_data(sess, task_id)
+            ok_result = await send_report_email(user.email, report_data)
+            if ok_result:
+                logger.info("自动发送报告成功: task_id=%s -> %s", task_id, user.email)
+            else:
+                logger.error("自动发送报告失败: task_id=%s -> %s", task_id, user.email)
+    except Exception as e:
+        logger.error("自动发送报告异常: task_id=%s, error=%s", task_id, e)
+
+
 # 前端中文时间范围文案 → DB 枚举值
 _TIME_RANGE_MAP = {
     "最近7天": TimeRange.d7,
@@ -333,6 +371,9 @@ async def run_crawl_task(
                     )
                 except Exception as track_err:
                     logger.error("自动启动追踪失败 (task_id=%s): %s", task_id, track_err)
+
+        # 7h) 分析完成 → 异步发送报告邮件（不阻塞主流程）
+        asyncio.create_task(_auto_send_report(task_id))
 
         logger.info(
             "后台爬取任务完成: task_id=%s, 原始评论=%d, 清洗后=%d, 话题数=%d",

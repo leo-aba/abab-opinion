@@ -1,0 +1,24 @@
+<h3>分析报告已生成</h3>
+<p>{{ video_title }}</p>
+<p style="color:#888;">平台：{{ video_platform }} | 作者：{{ video_uploader }} | {{ report_time }}</p>
+
+<hr>
+
+<p>评论总数：<strong>{{ total_comments }}</strong> | 话题数量：<strong>{{ topic_count }}</strong> | 正面占比：<strong style="color:#44D7B6;">{{ positive_pct }}%</strong></p>
+<p>情感分布：正面 {{ positive_pct }}% | 中性 {{ neutral_pct }}% | 负面 {{ negative_pct }}%</p>
+
+{% if top_topics %}
+<p>热门话题：{% for t in top_topics %}{{ t.name }}({{ t.percentage }}%){% if not loop.last %}、{% endif %}{% endfor %}</p>
+{% endif %}
+
+{% if ai_summary_text %}
+<hr>
+<p>AI 综合分析：{{ ai_summary_text }}</p>
+{% endif %}
+
+{% if highlights %}
+<p>话题要点：{% for h in highlights[:5] %}{{ h.label }}—{{ h.text }}{% if not loop.last %}；{% endif %}{% endfor %}</p>
+{% endif %}
+
+<hr>
+<p style="color:#aaa;font-size:12px;">由 AI Opinion Analytics 自动发送</p>

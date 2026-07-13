@@ -521,7 +521,7 @@ async def poll_tracking_comments(tracking_id: str) -> None:
                                     db, analysis_task.id,
                                 )
                                 comments_for_llm = [
-                                    {"text": c.content or ""} for c in unanalyzed
+                                    {"text": c.text or ""} for c in unanalyzed
                                 ]
                                 llm_result = await classify_new_comments_with_llm(
                                     comments_for_llm, existing_topics,

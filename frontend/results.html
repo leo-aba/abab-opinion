@@ -12,6 +12,9 @@
     <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
+    <!-- Toast 消息容器 -->
+    <div id="toast-container"></div>
+
     <div class="page app-page active" id="page-app">
 
         <div id="sidebar-container"></div>
@@ -167,6 +170,12 @@
                             <div class="lbl">中性评价</div>
                         </div>
                     </div>
+
+                    <button class="btn-send-report" id="send-report-btn" onclick="doSendReport()" title="发送分析摘要报告到注册邮箱">
+                        <span class="btn-icon">📧</span>
+                        <span class="btn-text">发送报告到邮箱</span>
+                        <span class="spinner"></span>
+                    </button>
 
                     <div class="chart-row">
                         <div class="chart-card">
@@ -335,6 +344,48 @@
         window.addEventListener('beforeunload', function() {
             if (resultsRefreshTimer) clearInterval(resultsRefreshTimer);
         });
+
+        // ============================================================
+        // Toast 消息
+        // ============================================================
+        /**
+         * 显示一个自动消失的 Toast 消息
+         * @param {string} message - 消息文本
+         * @param {'success'|'error'|'info'} type - 消息类型
+         */
+        function showToast(message, type) {
+            type = type || 'info';
+            var icon = type === 'success' ? '✅' : (type === 'error' ? '❌' : 'ℹ️');
+            var container = document.getElementById('toast-container');
+            var el = document.createElement('div');
+            el.className = 'toast-msg ' + type;
+            el.innerHTML = '<span class="toast-icon">' + icon + '</span><span class="toast-text">' + message + '</span>';
+            container.appendChild(el);
+            // 3 秒后移除
+            setTimeout(function() {
+                if (el.parentNode) el.parentNode.removeChild(el);
+            }, 3000);
+        }
+
+        /** 发送分析报告到注册邮箱 */
+        async function doSendReport() {
+            if (!currentTaskId) return;
+            var btn = document.getElementById('send-report-btn');
+            var btnText = btn.querySelector('.btn-text');
+            btn.disabled = true;
+            btn.classList.add('loading');
+            btnText.textContent = '发送中...';
+            try {
+                await api.sendReport(currentTaskId);
+                showToast('报告已发送至您的注册邮箱', 'success');
+            } catch (e) {
+                showToast(e.message || '发送失败，请稍后重试', 'error');
+            } finally {
+                btn.disabled = false;
+                btn.classList.remove('loading');
+                btnText.textContent = '发送报告到邮箱';
+            }
+        }
 
         // ============================================================
         // 概览标签页

@@ -548,3 +548,52 @@ input, select, textarea { font-family: inherit; }
   .login-hero h1 { font-size: 28px; }
   .login-card { padding: 24px; }
 }
+
+/* ============================================================
+   Toast 消息浮层
+   ============================================================ */
+#toast-container {
+  position: fixed; top: 80px; right: 24px; z-index: 10000;
+  display: flex; flex-direction: column; gap: 8px;
+  pointer-events: none;
+}
+.toast-msg {
+  padding: 12px 20px; border-radius: 10px; font-size: 14px; font-weight: 500;
+  color: #fff; pointer-events: auto; cursor: default;
+  animation: toastIn 0.35s ease, toastOut 0.35s ease 2.5s forwards;
+  max-width: 380px; box-shadow: 0 8px 32px rgba(0,0,0,.35);
+  display: flex; align-items: center; gap: 10px;
+}
+.toast-msg.success { background: linear-gradient(135deg, #1a7f4b, #238636); border: 1px solid #2ea043; }
+.toast-msg.error   { background: linear-gradient(135deg, #8b1e1e, #c1292e); border: 1px solid #da3633; }
+.toast-msg.info    { background: linear-gradient(135deg, #1a5c7f, #1f6feb); border: 1px solid #388bfd; }
+.toast-msg .toast-icon { font-size: 18px; flex-shrink: 0; }
+.toast-msg .toast-text { flex: 1; line-height: 1.4; }
+
+@keyframes toastIn  { from { opacity: 0; transform: translateX(40px); } to { opacity: 1; transform: translateX(0); } }
+@keyframes toastOut { from { opacity: 1; transform: translateX(0); }    to { opacity: 0; transform: translateX(40px); } }
+
+@media (max-width: 600px) {
+  #toast-container { top: 12px; right: 12px; left: 12px; }
+  .toast-msg { max-width: 100%; }
+}
+
+/* ============================================================
+   发送报告按钮
+   ============================================================ */
+.btn-send-report {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 8px 18px; background: rgba(255,122,34,.12); color: #FF7A22;
+  border: 1px solid rgba(255,122,34,.25); border-radius: 8px;
+  font-size: 13px; font-weight: 600; cursor: pointer;
+  transition: all .2s; margin-bottom: 16px;
+}
+.btn-send-report:hover { background: rgba(255,122,34,.20); border-color: #FF7A22; }
+.btn-send-report:disabled { opacity: .5; cursor: not-allowed; }
+.btn-send-report .spinner {
+  display: none; width: 14px; height: 14px; border: 2px solid rgba(255,122,34,.3);
+  border-top-color: #FF7A22; border-radius: 50%; animation: spin .6s linear infinite;
+}
+.btn-send-report.loading .spinner { display: block; }
+.btn-send-report.loading .btn-icon { display: none; }
+@keyframes spin { to { transform: rotate(360deg); } }

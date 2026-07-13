@@ -298,6 +298,12 @@ const api = {
   },
   /** 获取结果页追踪状态条数据 */
   getResultsTrackingStatus(taskId) { return get('/results/' + taskId + '/tracking-status'); },
+  /**
+   * 发送分析报告到用户注册邮箱
+   * @param {string} taskId - 分析任务 ID
+   * @returns {Promise<null>}
+   */
+  sendReport(taskId) { return post('/results/' + taskId + '/send-report'); },
 
   // ============================
   // 视频管理
