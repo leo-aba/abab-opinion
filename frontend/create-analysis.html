@@ -469,7 +469,9 @@ async function startAnalysis() {
     sessionStorage.setItem('analysisTaskId', result.task_id);
     sessionStorage.setItem('analysisMode', selectedMode);
     sessionStorage.setItem('analysisVideo', selectedVideo ? selectedVideo.title : '');
-    window.location.href = selectedMode === 'tracking' ? 'tracking.html' : 'pipeline.html';
+    // 追踪模式也跳到 pipeline.html，pipeline 页会在分析完成后自动启动追踪
+    var target = 'pipeline.html';
+    window.location.href = target + '?task_id=' + encodeURIComponent(result.task_id) + '&mode=' + encodeURIComponent(selectedMode);
   } catch (e) {
     alert('创建分析任务失败：' + e.message);
   }

@@ -367,8 +367,12 @@ async function executeDelete() {
         }
 
         closeModal();
-        // 刷新当前页
-        loadHistory(currentPage);
+        // 刷新当前页（await 确保刷新完成前按钮保持禁用）
+        try {
+            await loadHistory(currentPage);
+        } catch (e) {
+            console.error('删除后刷新失败:', e);
+        }
     } catch (e) {
         alert('删除失败: ' + e.message);
     } finally {

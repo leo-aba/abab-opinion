@@ -85,8 +85,27 @@
                         </div>
                     </div>
                     <div class="flex gap-4">
-                        <button class="btn-sm" onclick="window.location.href='pipeline.html'">刷新数据</button>
+                        <button class="btn-sm" onclick="location.reload()">刷新数据</button>
                         <button class="btn-danger-sm" id="btn-stop-tracking" onclick="stopTracking()">停止追踪</button>
+                    </div>
+                    <!-- Tracking Sentiment & Topics Row -->
+                    <div class="tracking-detail-row" id="tracking-detail-row" style="display:none;width:100%;flex-wrap:wrap;gap:16px;margin-top:4px;border-top:1px solid #333;padding-top:12px;">
+                        <div class="tracking-detail-item">
+                            <span class="label">新增情感</span>
+                            <span class="val" id="tracking-sentiment">—</span>
+                        </div>
+                        <div class="tracking-detail-item">
+                            <span class="label">已分析</span>
+                            <span class="val" id="tracking-analyzed">—</span>
+                        </div>
+                        <div class="tracking-sentiment-bar-wrap" style="flex:1;min-width:180px;">
+                            <div class="tracking-sentiment-bar" id="tracking-sentiment-bar" style="display:none;height:6px;border-radius:3px;overflow:hidden;gap:2px;">
+                                <span id="tracking-sent-pos" style="background:var(--cyan);height:100%;display:block;transition:width 0.5s;"></span>
+                                <span id="tracking-sent-neg" style="background:var(--orange);height:100%;display:block;transition:width 0.5s;"></span>
+                                <span id="tracking-sent-neu" style="background:#555;height:100%;display:block;transition:width 0.5s;"></span>
+                            </div>
+                        </div>
+                        <div class="tracking-topics-mini" id="tracking-topics-mini" style="font-size:11px;color:var(--text-secondary);display:flex;gap:12px;flex-wrap:wrap;"></div>
                     </div>
                 </div>
 
@@ -153,7 +172,10 @@
                         <div class="chart-card">
                             <div class="chart-card-header">
                                 <h3>评论趋势</h3>
-                                <span class="chart-badge">近30天</span>
+                                <div class="search-tabs" id="overview-trend-tabs">
+                                    <button class="search-tab active" onclick="switchOverviewTrendGranularity(this, 'day')">按天</button>
+                                    <button class="search-tab" onclick="switchOverviewTrendGranularity(this, 'hour')">按小时</button>
+                                </div>
                             </div>
                             <div class="chart-wrap">
                                 <canvas id="resultsTrendChart"></canvas>
@@ -284,7 +306,8 @@
         // ============================================================
         var currentTaskId = null;           // 当前分析任务 ID
         var currentTopicsData = [];         // Topic 列表缓存
-        var currentTrendGranularity = 'day'; // 趋势图粒度
+        var currentTrendGranularity = 'day'; // 趋势详情粒度
+        var overviewTrendGranularity = 'day'; // 概览趋势图粒度
         var tabsLoaded = {};               // 标签页懒加载标记
         var commentSearchTimer = null;      // 评论搜索防抖定时器
         var resultsRefreshTimer = null;    // 追踪模式自动刷新定时器
@@ -293,13 +316,13 @@
         // 初始化 — 从 URL 取 task_id，加载概览
         // ============================================================
         window.addEventListener('DOMContentLoaded', function() {
-            loadSidebar('results');
+            loadSidebar('history');
             initPage({ loadUser: true, loadHeaderStats: true });
 
             var params = new URLSearchParams(window.location.search);
             currentTaskId = params.get('task_id');
             if (!currentTaskId) {
-                showError('results-loading', '缺少 task_id 参数，请从分析任务列表进入。');
+                document.getElementById('results-loading').innerHTML = '<div style="text-align:center;padding:60px 20px;color:var(--text-secondary-dark);"><div style="font-size:40px;margin-bottom:12px;">📋</div><p style="font-size:15px;font-weight:500;">缺少 task_id 参数</p><p style="font-size:13px;margin-top:4px;">请从 <a href="history.html" style="color:var(--orange);">历史记录</a> 中选择一条任务查看结果。</p></div>';
                 return;
             }
             loadOverview();
@@ -353,7 +376,7 @@
                 setText('ov-neutral-pct', (overview.neutral_pct || 0) + '%');
 
                 // 加载趋势图和情绪饼图
-                var trendData = await api.getResultsTrend(currentTaskId, 'day');
+                var trendData = await api.getResultsTrend(currentTaskId, overviewTrendGranularity);
                 renderResultsTrend(trendData);
 
                 var sentimentData = await api.getResultsSentimentRatio(currentTaskId);
@@ -389,6 +412,9 @@
                     setText('tracking-total', (status.total_comments || 0).toLocaleString());
                     setText('tracking-credits', (status.credits_remaining || 0).toLocaleString());
                     setText('tracking-elapsed', status.duration_formatted || formatDuration(status.duration_seconds || 0));
+
+                    // 渲染新增评论情感和话题分布
+                    renderTrackingDetail(status);
                 } else {
                     currentTrackingId = null;
                     var bar = document.getElementById('results-tracking-bar');
@@ -396,6 +422,46 @@
                 }
             } catch (e) {
                 console.error('loadTrackingStatus error:', e);
+            }
+        }
+
+        /** 渲染追踪详细数据：情感条 + 话题分布 */
+        function renderTrackingDetail(status) {
+            var sent = status.new_comments_sentiment || {};
+            var pos = sent.positive || 0;
+            var neg = sent.negative || 0;
+            var neu = sent.neutral || 0;
+            var total = pos + neg + neu;
+
+            var detailRow = document.getElementById('tracking-detail-row');
+            if (total > 0 && detailRow) {
+                detailRow.style.display = '';
+                setText('tracking-sentiment', pos + ' 正面 / ' + neg + ' 负面 / ' + neu + ' 中性');
+                setText('tracking-analyzed', (status.analyzed_comments || 0).toLocaleString() + ' / ' + (status.new_comments || 0).toLocaleString());
+
+                // 渲染三色比例条
+                var bar = document.getElementById('tracking-sentiment-bar');
+                if (bar) {
+                    bar.style.display = 'flex';
+                    document.getElementById('tracking-sent-pos').style.width = (pos / total * 100).toFixed(1) + '%';
+                    document.getElementById('tracking-sent-neg').style.width = (neg / total * 100).toFixed(1) + '%';
+                    document.getElementById('tracking-sent-neu').style.width = (neu / total * 100).toFixed(1) + '%';
+                }
+
+                // 渲染话题分布
+                var topics = status.new_comments_topics || [];
+                var miniEl = document.getElementById('tracking-topics-mini');
+                if (miniEl && topics.length > 0) {
+                    var html = '<span style="font-weight:600;color:var(--cream);">话题分布</span> ';
+                    topics.slice(0, 5).forEach(function(t) {
+                        html += '<span style="background:#1A1A1A;padding:2px 8px;border-radius:10px;border:1px solid #333;">' +
+                            escapeHtml(t.topic_name) + ' +' + (t.count || 0) +
+                            '</span>';
+                    });
+                    miniEl.innerHTML = html;
+                }
+            } else if (detailRow) {
+                detailRow.style.display = 'none';
             }
         }
 
@@ -429,7 +495,7 @@
                 setText('ov-neutral-pct', (overview.neutral_pct || 0) + '%');
 
                 // 刷新趋势图
-                var trendData = await api.getResultsTrend(currentTaskId, 'day');
+                var trendData = await api.getResultsTrend(currentTaskId, overviewTrendGranularity);
                 renderResultsTrend(trendData);
 
                 // 刷新追踪状态条
@@ -439,6 +505,9 @@
                 setText('tracking-new', '+' + (status.new_comments || 0).toLocaleString());
                 setText('tracking-total', (status.total_comments || 0).toLocaleString());
                 setText('tracking-credits', (status.credits_remaining || 0).toLocaleString());
+                setText('tracking-elapsed', status.duration_formatted || formatDuration(status.duration_seconds || 0));
+                // 刷新情感条和话题分布
+                renderTrackingDetail(status);
             } catch (e) {
                 console.error('refreshIfTracking error:', e);
             }
@@ -591,6 +660,19 @@
             } catch (e) {
                 console.error('loadTrendsDetail error:', e);
             }
+        }
+
+        /** 切换概览趋势图粒度（天/小时）并重新加载 */
+        function switchOverviewTrendGranularity(btn, granularity) {
+            document.querySelectorAll('#overview-trend-tabs .search-tab').forEach(function(t) { t.classList.remove('active'); });
+            btn.classList.add('active');
+            overviewTrendGranularity = granularity;
+            if (!currentTaskId) return;
+            api.getResultsTrend(currentTaskId, granularity).then(function(trendData) {
+                renderResultsTrend(trendData);
+            }).catch(function(e) {
+                console.error('switchOverviewTrendGranularity error:', e);
+            });
         }
 
         /** 切换趋势粒度（日/小时/周）并重新加载 */

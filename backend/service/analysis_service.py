@@ -231,32 +231,31 @@ async def run_crawl_task(
                     logger.info("聚类分析完成: %d 个话题, 综述 %d 字", len(topics_data), len(overall_summary))
                 else:
                     comments_for_llm = [{"text": c.text} for c in db_comments]
-                comments_for_llm = [{"text": c.text} for c in db_comments]
 
-                # 后台脉冲更新进度（LLM 调用期间从 88% → 98%，每 4s 涨 2%）
-                async def _pulse_llm_progress():
-                    for pct in range(90, 99, 2):
-                        await asyncio.sleep(4)
-                        try:
-                            await _update_status(
-                                db, AnalysisStatus.summarizing,
-                                progress_pct=pct,
-                            )
-                        except Exception:
-                            break  # session 可能已失效，忽略
+                    # 后台脉冲更新进度（LLM 调用期间从 88% → 98%，每 4s 涨 2%）
+                    async def _pulse_llm_progress():
+                        for pct in range(90, 99, 2):
+                            await asyncio.sleep(4)
+                            try:
+                                await _update_status(
+                                    db, AnalysisStatus.summarizing,
+                                    progress_pct=pct,
+                                )
+                            except Exception:
+                                break  # session 可能已失效，忽略
 
-                pulse_task = asyncio.create_task(_pulse_llm_progress())
-                try:
-                    llm_result = await analyze_comments_with_llm(comments_for_llm)
-                finally:
-                    pulse_task.cancel()
+                    pulse_task = asyncio.create_task(_pulse_llm_progress())
                     try:
-                        await pulse_task
-                    except asyncio.CancelledError:
-                        pass
-                topics_data = llm_result.get("topics", [])
-                overall_summary = llm_result.get("overall_summary", "")
-                aspects = llm_result.get("aspects", [])
+                        llm_result = await analyze_comments_with_llm(comments_for_llm)
+                    finally:
+                        pulse_task.cancel()
+                        try:
+                            await pulse_task
+                        except asyncio.CancelledError:
+                            pass
+                    topics_data = llm_result.get("topics", [])
+                    overall_summary = llm_result.get("overall_summary", "")
+                    aspects = llm_result.get("aspects", [])
 
                 total = len(db_comments)
                 for topic_data in topics_data:
@@ -419,6 +418,7 @@ async def create_analysis_task(
         analysis_method=analysis_method,
     )
     db.add(task)
+    video.analysis_status = "analyzing"  # 标记视频为分析中
     await db.flush()
 
     # 4) 注册后台爬取任务
