@@ -97,17 +97,11 @@
                             <div class="setting-desc">新建分析时的默认评论抓取量</div>
                         </div>
                         <select id="setting-default-comment-count" style="padding:6px 12px;border:1px solid var(--border);border-radius:6px;font-size:13px;" onchange="onDefaultCommentCountChange()">
+                            <option value="100">100</option>
+                            <option value="200">200</option>
                             <option value="500">500</option>
-                            <option value="1000">1000</option>
-                            <option value="5000">5000</option>
+                            <option value="0">全部</option>
                         </select>
-                    </div>
-                    <div class="setting-row">
-                        <div>
-                            <div class="setting-label">自动生成 AI 总结</div>
-                            <div class="setting-desc">分析完成后自动调用大模型生成总结报告</div>
-                        </div>
-                        <div class="toggle-switch" id="toggle-auto-ai-summary" onclick="onToggleAutoAiSummary()"></div>
                     </div>
                 </div>
 
@@ -119,13 +113,6 @@
                             <div class="setting-desc">分析完成后通过邮件/站内信通知</div>
                         </div>
                         <div class="toggle-switch" id="toggle-analysis-complete-notify" onclick="onToggleAnalysisCompleteNotify()"></div>
-                    </div>
-                    <div class="setting-row">
-                        <div>
-                            <div class="setting-label">异常预警</div>
-                            <div class="setting-desc">当负面情绪突增时发送预警通知</div>
-                        </div>
-                        <div class="toggle-switch" id="toggle-anomaly-alert" onclick="onToggleAnomalyAlert()"></div>
                     </div>
                     <div class="setting-row">
                         <div>
@@ -216,14 +203,12 @@ async function loadSettings() {
             if (ap.default_comment_count) {
                 countSelect.value = ap.default_comment_count;
             }
-            setToggleState('toggle-auto-ai-summary', ap.auto_ai_summary);
         }
 
         // 通知偏好
         if (currentSettings.notification_preferences) {
             const np = currentSettings.notification_preferences;
             setToggleState('toggle-analysis-complete-notify', np.analysis_complete_notify);
-            setToggleState('toggle-anomaly-alert', np.anomaly_alert);
             const sel = document.getElementById('setting-report-interval');
             if (sel) sel.value = np.report_interval_minutes ?? 30;
         }
@@ -265,20 +250,6 @@ async function onDefaultCommentCountChange() {
     }
 }
 
-/** 自动 AI 总结开关 → 保存 */
-async function onToggleAutoAiSummary() {
-    const el = document.getElementById('toggle-auto-ai-summary');
-    const newVal = !el.classList.contains('on');
-    el.classList.toggle('on');
-    try {
-        await api.updateAnalysisPreferences({ auto_ai_summary: newVal });
-    } catch (e) {
-        console.error('update auto_ai_summary error:', e);
-        alert('保存失败：' + (e.message || '未知错误'));
-        await loadSettings();
-    }
-}
-
 // ---- 通知偏好变更处理 ----
 
 /** 分析完成通知开关 → 保存 */
@@ -290,20 +261,6 @@ async function onToggleAnalysisCompleteNotify() {
         await api.updateNotificationPreferences({ analysis_complete_notify: newVal });
     } catch (e) {
         console.error('update analysis_complete_notify error:', e);
-        alert('保存失败：' + (e.message || '未知错误'));
-        await loadSettings();
-    }
-}
-
-/** 异常预警通知开关 → 保存 */
-async function onToggleAnomalyAlert() {
-    const el = document.getElementById('toggle-anomaly-alert');
-    const newVal = !el.classList.contains('on');
-    el.classList.toggle('on');
-    try {
-        await api.updateNotificationPreferences({ anomaly_alert: newVal });
-    } catch (e) {
-        console.error('update anomaly_alert error:', e);
         alert('保存失败：' + (e.message || '未知错误'));
         await loadSettings();
     }

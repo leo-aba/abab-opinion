@@ -493,7 +493,18 @@ function escapeAttr(str) {
   selectMode('tracking');
   renderRangeOptions();
   loadSidebar('create-analysis');
-  initPage({ loadUser: true }).then(function() {
+  initPage({ loadUser: true }).then(async function() {
+    // 读取用户设置的默认评论数量，预选匹配项
+    try {
+      var settings = await api.getSettings();
+      var defCount = settings.analysis_preferences.default_comment_count;
+      var mapping = {100: '最近100条', 200: '最近200条', 500: '最近500条', 0: '全部'};
+      if (defCount !== undefined && mapping[defCount]) {
+        selectedCount = mapping[defCount];
+        renderRangeOptions();
+      }
+    } catch (e) { console.log('加载默认评论数量失败:', e); }
+
     // 从视频管理跳转：自动填充URL并搜索
     var urlParams = new URLSearchParams(window.location.search);
     var videoUrl = urlParams.get('url');
