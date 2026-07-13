@@ -26,6 +26,9 @@ class UserSettings(Base):
     realtime_animation: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     notify_on_complete: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     notify_on_anomaly: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    report_interval_minutes: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=30, comment="追踪期间报告邮件发送间隔（分钟）"
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime, default=datetime.utcnow, nullable=False
     )

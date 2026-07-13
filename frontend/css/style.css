@@ -579,21 +579,26 @@ input, select, textarea { font-family: inherit; }
 }
 
 /* ============================================================
-   发送报告按钮
+   发送报告按钮 — 实心橙色 CTA，网站风格
    ============================================================ */
 .btn-send-report {
-  display: inline-flex; align-items: center; gap: 6px;
-  padding: 8px 18px; background: rgba(255,122,34,.12); color: #FF7A22;
-  border: 1px solid rgba(255,122,34,.25); border-radius: 8px;
-  font-size: 13px; font-weight: 600; cursor: pointer;
-  transition: all .2s; margin-bottom: 16px;
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 10px 24px;
+  background: var(--orange); color: var(--cream);
+  border: 2px solid var(--orange); border-radius: var(--radius-sm);
+  font-size: 14px; font-weight: 700; cursor: pointer;
+  transition: all var(--transition);
+  white-space: nowrap;
 }
-.btn-send-report:hover { background: rgba(255,122,34,.20); border-color: #FF7A22; }
-.btn-send-report:disabled { opacity: .5; cursor: not-allowed; }
+.btn-send-report:hover { background: #E0681A; border-color: #E0681A; transform: translateY(-1px); }
+.btn-send-report:active { transform: scale(0.97); }
+.btn-send-report:disabled { opacity: .4; cursor: not-allowed; transform: none; }
+.btn-send-report .btn-mail-icon { width: 18px; height: 18px; stroke: var(--cream); flex-shrink: 0; }
+.btn-send-report.loading .btn-mail-icon { display: none; }
+.btn-send-report.loading .btn-text { opacity: .6; }
 .btn-send-report .spinner {
-  display: none; width: 14px; height: 14px; border: 2px solid rgba(255,122,34,.3);
-  border-top-color: #FF7A22; border-radius: 50%; animation: spin .6s linear infinite;
+  display: none; width: 16px; height: 16px; border: 2px solid rgba(248,242,228,.3);
+  border-top-color: var(--cream); border-radius: 50%; animation: spin .6s linear infinite;
 }
 .btn-send-report.loading .spinner { display: block; }
-.btn-send-report.loading .btn-icon { display: none; }
 @keyframes spin { to { transform: rotate(360deg); } }

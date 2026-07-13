@@ -21,6 +21,7 @@ from backend.models.topic import Topic
 from backend.models.video import Video
 from backend.models.comment import Comment
 from backend.models.user import User
+from backend.models.user_settings import UserSettings
 from backend.service.video_service import (
     fetch_bilibili_comment_page,
     fetch_douyin_comments,
@@ -556,6 +557,20 @@ async def poll_tracking_comments(tracking_id: str) -> None:
                         else:
                             logger.debug("追踪增量分类跳过: tracking_id=%s 无未分析评论", tracking_id)
 
+                    # 8) 周期性报告邮件（追踪运行中的定时更新）
+                    try:
+                        from backend.service.report_service import try_send_periodic_report
+
+                        stmt = select(UserSettings).where(UserSettings.user_id == user.id)
+                        result = await db.execute(stmt)
+                        us = result.scalar_one_or_none()
+                        await try_send_periodic_report(db, tracking, user, us)
+                    except Exception as e:
+                        logger.error(
+                            "追踪周期报告异常 (tracking_id=%s): %s",
+                            tracking_id, e, exc_info=True,
+                        )
+
                     await db.commit()
 
             except asyncio.CancelledError:
@@ -653,6 +668,7 @@ async def create_tracking_task(
         last_comment_id=last_cid,
         last_analyzed_comment_id=last_cid,  # 初始分析已覆盖这些评论
         last_analyzed_at=now,
+        last_report_at=now,  # 初始报告已由 _auto_send_report 发送，从此刻开始计时
     )
     db.add(task)
     await db.flush()

@@ -13,6 +13,8 @@ from backend.models.analysis_task import AnalysisTask
 from backend.models.user import User
 from backend.models.video import Video
 from backend.models.topic import Topic
+from backend.models.tracking_task import TrackingTask
+from backend.models.user_settings import UserSettings
 
 logger = logging.getLogger("report_service")
 
@@ -47,7 +49,7 @@ def _build_sentiment_bar(pos_pct: float, neu_pct: float, neg_pct: float) -> str:
 # 报告 HTML 生成（xc 分支风格：Python 拼 HTML，不用模板）
 # ──────────────────────────────────────────────
 
-async def generate_report_html(db: AsyncSession, task_id: str) -> str:
+async def generate_report_html(db: AsyncSession, task_id: str, is_periodic: bool = False) -> str:
     """生成分析报告 HTML 邮件正文。
 
     配色与网站一致：奶油底色 #F8F2E4 + 黑色卡片 + 橙色 #FF7A22 / 青色 #00B4CC 强调。
@@ -160,6 +162,11 @@ async def generate_report_html(db: AsyncSession, task_id: str) -> str:
         if video_url else ""
     )
 
+    # ── 周期性 vs 首次 的标题文案 ──
+    hero_title = "追踪分析更新" if is_periodic else "分析报告已生成"
+    hero_sub = "AI Opinion Analytics · 实时追踪更新报告" if is_periodic else "AI Opinion Analytics · 视频评论分析报告"
+    intro_text = "您的实时追踪发现了新的分析数据，以下为最新报告：" if is_periodic else "您的视频评论分析已完成，以下为分析报告详情："
+
     # ── 组装完整 HTML ──
     html = f"""<!DOCTYPE html>
 <html lang="zh-CN">
@@ -169,12 +176,12 @@ async def generate_report_html(db: AsyncSession, task_id: str) -> str:
 <tr><td align="center">
 <table width="600" cellpadding="0" cellspacing="0" style="background:#000;border-radius:18px;overflow:hidden;border:2px solid #FF7A22;">
     <tr><td style="background:#FF7A22;padding:28px 32px 20px;text-align:center;">
-        <h1 style="margin:0;font-size:22px;font-weight:800;color:#000;letter-spacing:0.5px;">分析报告已生成</h1>
-        <p style="margin:6px 0 0;font-size:13px;color:#000;opacity:0.7;">AI Opinion Analytics · 视频评论分析报告</p>
+        <h1 style="margin:0;font-size:22px;font-weight:800;color:#000;letter-spacing:0.5px;">{hero_title}</h1>
+        <p style="margin:6px 0 0;font-size:13px;color:#000;opacity:0.7;">{hero_sub}</p>
     </td></tr>
     <tr><td style="padding:20px 32px 8px;">
         <p style="margin:0;font-size:14px;color:#F8F2E4;">尊敬的 <strong style="color:#FF7A22;">{username}</strong>，您好！</p>
-        <p style="margin:6px 0 0;font-size:13px;color:#BFB59E;">您的视频评论分析已完成，以下为分析报告详情：</p>
+        <p style="margin:6px 0 0;font-size:13px;color:#BFB59E;">{intro_text}</p>
     </td></tr>
     <tr><td style="padding:12px 32px;">
         <div style="background:#1A1A1A;border:1px solid #FF7A22;border-radius:14px;padding:16px;">
@@ -351,4 +358,70 @@ async def try_auto_send_report(
             return False
     except Exception as e:
         logger.error("自动发送报告异常: task_id=%s, error=%s", task_id, e)
+        return False
+
+
+# ──────────────────────────────────────────────
+# 周期性报告（实时追踪模式专用）
+# ──────────────────────────────────────────────
+
+async def try_send_periodic_report(
+    db: AsyncSession,
+    tracking: TrackingTask,
+    user: User,
+    user_settings: UserSettings | None,
+) -> bool:
+    """追踪循环中调用：间隔足够且有新分析数据时发送更新报告。
+
+    此函数设计为独立调用，自行处理所有异常，不抛出。
+
+    Args:
+        db: 当前轮询循环中的数据库 session
+        tracking: TrackingTask ORM 对象（已在 session 中加载）
+        user: User ORM 对象
+        user_settings: UserSettings（可为 None，使用默认值）
+
+    Returns:
+        True 已发送，False 跳过或失败
+    """
+    try:
+        # 1) 检查通知开关
+        if user_settings and not user_settings.notify_on_complete:
+            return False
+
+        # 2) 检查邮箱
+        if not user.email:
+            return False
+
+        # 3) 间隔：默认 30 分钟，最小 5 分钟
+        interval_mins = max(5, user_settings.report_interval_minutes if user_settings else 30)
+
+        # 4) 检查是否距上次发送足够久
+        now = datetime.utcnow()
+        if tracking.last_report_at is not None:
+            elapsed = (now - tracking.last_report_at).total_seconds() / 60
+            if elapsed < interval_mins:
+                return False  # 间隔未到
+
+        # 5) 检查是否有新分析数据
+        if tracking.last_report_at is not None and tracking.last_analyzed_at is not None:
+            if tracking.last_analyzed_at <= tracking.last_report_at:
+                logger.debug("周期性报告跳过: 无新分析数据 (tracking_id=%s)", tracking.id)
+                return False
+
+        # 6) 生成 HTML 并发送
+        html_body = await generate_report_html(db, tracking.analysis_task_id, is_periodic=True)
+        subject = "【AI Opinion Analytics】追踪分析更新"
+
+        success = send_email(user.email, subject, html_body)
+        if success:
+            tracking.last_report_at = now
+            logger.info("周期性报告发送成功: tracking_id=%s -> %s", tracking.id, user.email)
+            return True
+        else:
+            logger.error("周期性报告发送失败: tracking_id=%s -> %s", tracking.id, user.email)
+            return False
+
+    except Exception as e:
+        logger.error("周期性报告异常 (tracking_id=%s): %s", tracking.id, e, exc_info=True)
         return False

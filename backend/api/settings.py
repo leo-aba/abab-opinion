@@ -30,6 +30,7 @@ def _build_response(user: User, settings: UserSettings | None) -> dict:
         np = NotificationPreferences(
             analysis_complete_notify=settings.notify_on_complete,
             anomaly_alert=settings.notify_on_anomaly,
+            report_interval_minutes=settings.report_interval_minutes,
         )
     else:
         # 无记录时返回全默认值
@@ -101,13 +102,15 @@ async def update_notification_preferences(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """更新通知偏好：analysis_complete_notify / anomaly_alert（部分更新）"""
+    """更新通知偏好：analysis_complete_notify / anomaly_alert / report_interval_minutes（部分更新）"""
     settings = await _get_or_create_settings(current_user.id, db)
 
     if body.analysis_complete_notify is not None:
         settings.notify_on_complete = body.analysis_complete_notify  # 前端字段 → DB 列
     if body.anomaly_alert is not None:
         settings.notify_on_anomaly = body.anomaly_alert  # 前端字段 → DB 列
+    if body.report_interval_minutes is not None:
+        settings.report_interval_minutes = body.report_interval_minutes
 
     await db.flush()
     logger.info('用户"%s"更新通知偏好', current_user.username)

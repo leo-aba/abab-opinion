@@ -36,6 +36,7 @@ async def _auto_send_report(task_id: str) -> None:
         from backend.service.report_service import build_report_data, send_report_email
         from backend.models.user_settings import UserSettings
         from backend.models.user import User
+        from backend.models.tracking_task import TrackingTask, TrackingStatus
         from sqlalchemy import select as sa_select
 
         async with get_sessionmaker()() as sess:
@@ -61,6 +62,24 @@ async def _auto_send_report(task_id: str) -> None:
             ok_result = await send_report_email(user.email, report_data)
             if ok_result:
                 logger.info("自动发送报告成功: task_id=%s -> %s", task_id, user.email)
+
+                # 如果是追踪模式，更新 TrackingTask.last_report_at 以对齐定时器
+                if task.mode == AnalysisMode.tracking:
+                    try:
+                        from datetime import datetime as dt
+                        tr = await sess.execute(
+                            sa_select(TrackingTask).where(
+                                TrackingTask.analysis_task_id == task_id,
+                                TrackingTask.status == TrackingStatus.active,
+                            )
+                        )
+                        tracking = tr.scalar_one_or_none()
+                        if tracking:
+                            tracking.last_report_at = dt.utcnow()
+                            await sess.commit()
+                            logger.debug("已更新 TrackingTask.last_report_at (tracking_id=%s)", tracking.id)
+                    except Exception:
+                        pass  # 非关键操作
             else:
                 logger.error("自动发送报告失败: task_id=%s -> %s", task_id, user.email)
     except Exception as e:

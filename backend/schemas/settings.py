@@ -12,6 +12,7 @@ class AnalysisPreferences(BaseModel):
 class NotificationPreferences(BaseModel):
     analysis_complete_notify: bool = True
     anomaly_alert: bool = True
+    report_interval_minutes: int = 30
 
 
 class AccountInfo(BaseModel):
@@ -42,3 +43,4 @@ class UpdateNotificationPreferencesRequest(BaseModel):
     """PUT /api/settings/notification-preferences — 所有字段可选，只更新传入的"""
     analysis_complete_notify: bool | None = None
     anomaly_alert: bool | None = None
+    report_interval_minutes: int | None = None

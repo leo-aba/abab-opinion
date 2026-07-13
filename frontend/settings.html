@@ -133,6 +133,19 @@
                         </div>
                         <div class="toggle-switch" id="toggle-anomaly-alert" onclick="onToggleAnomalyAlert()"></div>
                     </div>
+                    <div class="setting-row">
+                        <div>
+                            <div class="setting-label">追踪报告频率</div>
+                            <div class="setting-desc">实时追踪中每隔多久发送一次分析报告邮件</div>
+                        </div>
+                        <select id="setting-report-interval" onchange="onReportIntervalChange()" style="padding:8px 12px;border:2px solid #FF7A22;border-radius:10px;background:#000;color:#F8F2E4;font-size:13px;cursor:pointer;">
+                            <option value="15">每 15 分钟</option>
+                            <option value="30">每 30 分钟</option>
+                            <option value="60">每 1 小时</option>
+                            <option value="120">每 2 小时</option>
+                            <option value="240">每 4 小时</option>
+                        </select>
+                    </div>
                 </div>
 
                 <div class="settings-section">
@@ -216,6 +229,8 @@ async function loadSettings() {
             const np = currentSettings.notification_preferences;
             setToggleState('toggle-analysis-complete-notify', np.analysis_complete_notify);
             setToggleState('toggle-anomaly-alert', np.anomaly_alert);
+            const sel = document.getElementById('setting-report-interval');
+            if (sel) sel.value = np.report_interval_minutes ?? 30;
         }
 
         // 账户信息
@@ -294,6 +309,19 @@ async function onToggleAnomalyAlert() {
         await api.updateNotificationPreferences({ anomaly_alert: newVal });
     } catch (e) {
         console.error('update anomaly_alert error:', e);
+        alert('保存失败：' + (e.message || '未知错误'));
+        await loadSettings();
+    }
+}
+
+/** 追踪报告频率下拉变更 → 保存 */
+async function onReportIntervalChange() {
+    const sel = document.getElementById('setting-report-interval');
+    const val = parseInt(sel.value);
+    try {
+        await api.updateNotificationPreferences({ report_interval_minutes: val });
+    } catch (e) {
+        console.error('update report_interval_minutes error:', e);
         alert('保存失败：' + (e.message || '未知错误'));
         await loadSettings();
     }
