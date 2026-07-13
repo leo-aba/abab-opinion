@@ -162,7 +162,7 @@ const api = {
    * @param {number} [days=30] - 查询天数
    * @returns {Promise<{labels: string[], values: number[]}>}
    */
-  getDashboardTrend(days) { return get('/dashboard/trend?days=' + (days || 30)); },
+  getDashboardTrend(days, granularity) { return get('/dashboard/trend?days=' + (days || 30) + '&granularity=' + (granularity || 'day')); },
   /** 获取情绪占比（正面/负面/中性） */
   getDashboardSentimentRatio() { return get('/dashboard/sentiment-ratio'); },
   /**
@@ -298,6 +298,12 @@ const api = {
   },
   /** 获取结果页追踪状态条数据 */
   getResultsTrackingStatus(taskId) { return get('/results/' + taskId + '/tracking-status'); },
+  /**
+   * 发送分析报告到用户注册邮箱
+   * @param {string} taskId - 分析任务 ID
+   * @returns {Promise<null>}
+   */
+  sendReport(taskId) { return post('/results/' + taskId + '/send-report'); },
 
   // ============================
   // 视频管理

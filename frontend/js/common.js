@@ -21,7 +21,7 @@ function closeSidebar() {
 /** 导航菜单数据结构 */
 var SIDEBAR_NAV = [
   { section: '主菜单' },
-  { page: 'dashboard',       href: 'dashboard.html',       label: 'Dashboard',  svg: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>' },
+  { page: 'dashboard',       href: 'dashboard.html',       label: '数据总览',   svg: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>' },
   { page: 'create-analysis', href: 'create-analysis.html', label: '创建分析',   svg: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 8v8M8 12h8"/></svg>' },
   { page: 'pipeline',        href: 'pipeline.html',        label: '实时分析',   svg: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>' },
   { page: 'tracking',        href: 'tracking.html',        label: '实时追踪',   svg: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="4" fill="currentColor"/><line x1="12" y1="2" x2="12" y2="6"/><line x1="12" y1="18" x2="12" y2="22"/><line x1="2" y1="12" x2="6" y2="12"/><line x1="18" y1="12" x2="22" y2="12"/></svg>', tracking: true },
@@ -203,7 +203,7 @@ function formatCount(n) {
  * 所有需要登录的页面在 DOMContentLoaded 时应首先调用此函数
  * @param {{loadUser?: boolean, loadHeaderStats?: boolean}} [options] - 控制加载内容
  *   - loadUser: 是否加载用户信息（默认 true）
- *   - loadHeaderStats: 是否加载顶部统计（默认 true）
+ *   - loadHeaderStats: 是否加载顶部统计（默认 false）
  * @returns {Promise<{user?: object, headerStats?: object, hasTracking?: boolean}|null>}
  *   未登录时跳转登录页并返回 null
  */
@@ -226,7 +226,7 @@ async function initPage(options) {
     }
 
     // 加载顶部统计数字 — 今日评论/新视频/完成率/热门话题
-    if (options && options.loadHeaderStats !== false) {
+    if (options && options.loadHeaderStats === true) {
       result.headerStats = await api.getHeaderStats();
       setText('stat-today-comments', (result.headerStats.today_comments || 0).toLocaleString());
       setText('stat-new-videos', (result.headerStats.new_videos || 0).toString());

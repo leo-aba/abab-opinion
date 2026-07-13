@@ -311,12 +311,12 @@ async def _get_user_task_ids(db: AsyncSession, user_id: str) -> list[str]:
 
 
 async def get_dashboard_trend(
-    db: AsyncSession, user_id: str, days: int = 30
+    db: AsyncSession, user_id: str, days: int = 30, granularity: str = "day"
 ) -> dict:
-    """获取近 N 天评论趋势数据（按天汇总）。
+    """获取评论趋势数据，支持按天或按小时汇总。
 
-    注意：统计所有评论（含 is_cleaned=0 和 =1），即清洗前总数。
-    这与用户需求"评论数曲线图选清洗前的评论数"一致。
+    按天：近 N 天每天的评论量
+    按小时：近 24 小时每小时的评论量（适合实时追踪场景）
 
     Returns:
         {labels: [str], values: [int]}
@@ -325,6 +325,38 @@ async def get_dashboard_trend(
     if not video_ids:
         return {"labels": [], "values": []}
 
+    if granularity == "hour":
+        # 近 24 小时，按小时汇总
+        cutoff = datetime.utcnow() - timedelta(hours=24)
+
+        rows = await db.execute(
+            select(
+                func.hour(Comment.create_time).label("h"),
+                func.count(Comment.id).label("cnt"),
+            )
+            .where(
+                Comment.video_id.in_(video_ids),
+                Comment.create_time >= cutoff,
+            )
+            .group_by(text("h"))
+            .order_by(text("h"))
+        )
+        hour_map = {}
+        for row in rows.all():
+            hour_map[row.h] = row.cnt
+
+        labels = []
+        values = []
+        # 生成完整 24 小时序列
+        start_hour = cutoff.hour
+        for i in range(24):
+            h = (start_hour + i) % 24
+            labels.append(f"{h:02d}:00")
+            values.append(hour_map.get(h, 0))
+
+        return {"labels": labels, "values": values}
+
+    # 默认：按天汇总
     cutoff = datetime.utcnow() - timedelta(days=days)
 
     rows = await db.execute(

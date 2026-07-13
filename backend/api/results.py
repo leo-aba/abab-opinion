@@ -25,6 +25,12 @@ from backend.service.results_service import (
     get_sentiment_attribute,
 )
 from backend.service.tracking_service import get_tracking_status as _get_ts
+from backend.service.report_service import (
+    build_report_data,
+    send_report_email,
+    check_rate_limit,
+    mark_rate_limit,
+)
 
 logger = logging.getLogger("results_api")
 
@@ -267,3 +273,51 @@ async def tracking_status(
         "last_analyzed_at": status_data.get("last_analyzed_at"),
         "duration_seconds": duration_seconds,
     })
+
+
+# ──────────────────────────────────────────────
+# 发送分析报告到邮箱
+# ──────────────────────────────────────────────
+
+
+@router.post("/{task_id}/send-report", summary="发送分析报告到邮箱")
+async def send_report(
+    task_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """将当前分析结果的摘要报告发送到用户注册邮箱。
+
+    限制: 同用户同任务 60 秒内只能发送一次。
+    """
+    task = await _get_task(task_id, current_user, db)
+
+    # 校验任务状态
+    if task.status.value != "completed":
+        raise HTTPException(status_code=400, detail="分析尚未完成，无法发送报告")
+
+    # 校验用户邮箱
+    if not current_user.email:
+        raise HTTPException(status_code=400, detail="请先在设置中绑定邮箱")
+
+    # 频率限制
+    wait = check_rate_limit(current_user.id, task_id)
+    if wait is not None:
+        raise HTTPException(status_code=429, detail=f"请 {wait} 秒后再试")
+
+    # 组装报告数据并发送
+    try:
+        report_data = await build_report_data(db, task_id)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+    ok_result = await send_report_email(current_user.email, report_data)
+    if not ok_result:
+        logger.error("发送报告失败: task_id=%s, user=%s, email=%s",
+                      task_id, current_user.username, current_user.email)
+        raise HTTPException(status_code=502, detail="邮件发送失败，请稍后重试")
+
+    mark_rate_limit(current_user.id, task_id)
+    logger.info("报告已发送: task_id=%s, user=%s, email=%s",
+                task_id, current_user.username, current_user.email)
+    return ok(None, "报告已发送至您的注册邮箱")

@@ -5,13 +5,11 @@ from pydantic import BaseModel
 
 class AnalysisPreferences(BaseModel):
     default_comment_count: int = 500
-    auto_ai_summary: bool = True
-    realtime_animation: bool = True
 
 
 class NotificationPreferences(BaseModel):
     analysis_complete_notify: bool = True
-    anomaly_alert: bool = True
+    report_interval_minutes: int = 30
 
 
 class AccountInfo(BaseModel):
@@ -35,10 +33,9 @@ class SettingsData(BaseModel):
 class UpdateAnalysisPreferencesRequest(BaseModel):
     """PUT /api/settings/analysis-preferences — 所有字段可选，只更新传入的"""
     default_comment_count: int | None = None
-    auto_ai_summary: bool | None = None
 
 
 class UpdateNotificationPreferencesRequest(BaseModel):
     """PUT /api/settings/notification-preferences — 所有字段可选，只更新传入的"""
     analysis_complete_notify: bool | None = None
-    anomaly_alert: bool | None = None
+    report_interval_minutes: int | None = None

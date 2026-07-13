@@ -83,6 +83,38 @@ def _build_analysis_prompt(comments: list[dict]) -> str:
     return prompt
 
 
+def _try_repair_json(raw: str) -> dict | None:
+    """尝试修复被截断的 JSON：补全缺失的括号/引号，提取已解析出的字段。"""
+    try:
+        # 方法1：尝试找到最后一个完整的 key，截断后补全
+        # 先尝试用 json.loads 逐段解析
+        return json.loads(raw)
+    except json.JSONDecodeError as e:
+        pass
+
+    try:
+        # 方法2：截断到最后一个有效字符，补上结束符号
+        # 找到最后一个 ] 或 }，截断后尝试补全
+        last_valid = max(raw.rfind("]"), raw.rfind("}"))
+        if last_valid > 0:
+            truncated = raw[: last_valid + 1]
+            # 补全缺失的闭合括号
+            open_braces = truncated.count("{") - truncated.count("}")
+            open_brackets = truncated.count("[") - truncated.count("]")
+            truncated += "}" * max(0, open_braces)
+            truncated += "]" * max(0, open_brackets)
+            result = json.loads(truncated)
+            # 至少要有 topics 或 overall_summary
+            if result.get("topics") or result.get("overall_summary"):
+                logger.info("JSON 修复成功 (截断补全), 话题数=%d", len(result.get("topics", [])))
+                return result
+    except (json.JSONDecodeError, Exception):
+        pass
+
+    logger.warning("JSON 修复失败，放弃本次 LLM 结果")
+    return None
+
+
 async def analyze_comments_with_llm(comments: list[dict]) -> dict:
     """调用 DeepSeek 大模型分析评论。
 
@@ -111,13 +143,14 @@ async def analyze_comments_with_llm(comments: list[dict]) -> dict:
 
     prompt = _build_analysis_prompt(comments)
 
+    raw = ""
     try:
         resp = await client.chat.completions.create(
             model=DEEPSEEK_MODEL,
             messages=[
                 {
                     "role": "system",
-                    "content": "你是一个专业的评论分析助手。请严格按 JSON 格式返回结果，不要附加任何其他文字。"
+                    "content": "你是一个专业的评论分析助手。请严格按 JSON 格式返回结果，不要附加任何其他文字。",
                 },
                 {
                     "role": "user",
@@ -125,6 +158,7 @@ async def analyze_comments_with_llm(comments: list[dict]) -> dict:
                 },
             ],
             temperature=0.7,
+            max_tokens=16384,  # 确保足够输出空间，避免 JSON 截断
             response_format={"type": "json_object"},
             timeout=300,  # 5 分钟超时
         )
@@ -146,6 +180,17 @@ async def analyze_comments_with_llm(comments: list[dict]) -> dict:
 
     except json.JSONDecodeError as e:
         logger.error("LLM 返回 JSON 解析失败: %s", e)
+        # JSON 可能被截断，尝试修复
+        if raw:
+            logger.warning("尝试修复被截断的 JSON，原始长度=%d", len(raw))
+            repaired = _try_repair_json(raw)
+            if repaired:
+                topics = repaired.get("topics", [])
+                aspects = repaired.get("aspects", [])
+                overall_summary = repaired.get("overall_summary", "")
+                if topics or overall_summary:
+                    logger.info("JSON 修复成功: 话题数=%d", len(topics))
+                    return {"topics": topics, "aspects": aspects, "overall_summary": overall_summary}
         return {"topics": [], "aspects": [], "overall_summary": ""}
     except Exception as e:
         logger.error("LLM 调用失败: %s", e)

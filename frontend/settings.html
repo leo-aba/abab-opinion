@@ -85,12 +85,6 @@
                         <div class="greeting">管理系统配置与偏好</div>
                     </div>
                 </div>
-                <div class="header-stats">
-                    <div class="header-stat"><div class="val" id="stat-today-comments">—</div><div class="lbl">今日评论</div></div>
-                    <div class="header-stat"><div class="val" id="stat-new-videos">—</div><div class="lbl">新增视频</div></div>
-                    <div class="header-stat"><div class="val" id="stat-completion">—</div><div class="lbl">分析完成</div></div>
-                    <div class="header-stat"><div class="val" id="stat-hot-topic">—</div><div class="lbl">最近热点</div></div>
-                </div>
             </header>
 
             <!-- Page Content -->
@@ -103,17 +97,11 @@
                             <div class="setting-desc">新建分析时的默认评论抓取量</div>
                         </div>
                         <select id="setting-default-comment-count" style="padding:6px 12px;border:1px solid var(--border);border-radius:6px;font-size:13px;" onchange="onDefaultCommentCountChange()">
+                            <option value="100">100</option>
+                            <option value="200">200</option>
                             <option value="500">500</option>
-                            <option value="1000">1000</option>
-                            <option value="5000">5000</option>
+                            <option value="0">全部</option>
                         </select>
-                    </div>
-                    <div class="setting-row">
-                        <div>
-                            <div class="setting-label">自动生成 AI 总结</div>
-                            <div class="setting-desc">分析完成后自动调用大模型生成总结报告</div>
-                        </div>
-                        <div class="toggle-switch" id="toggle-auto-ai-summary" onclick="onToggleAutoAiSummary()"></div>
                     </div>
                 </div>
 
@@ -128,10 +116,17 @@
                     </div>
                     <div class="setting-row">
                         <div>
-                            <div class="setting-label">异常预警</div>
-                            <div class="setting-desc">当负面情绪突增时发送预警通知</div>
+                            <div class="setting-label">追踪报告频率</div>
+                            <div class="setting-desc">实时追踪中每隔多久发送一次分析报告邮件</div>
                         </div>
-                        <div class="toggle-switch" id="toggle-anomaly-alert" onclick="onToggleAnomalyAlert()"></div>
+                        <select id="setting-report-interval" onchange="onReportIntervalChange()" style="padding:8px 12px;border:2px solid #FF7A22;border-radius:10px;background:#000;color:#F8F2E4;font-size:13px;cursor:pointer;">
+                            <option value="0">不发送</option>
+                            <option value="15">每 15 分钟</option>
+                            <option value="30">每 30 分钟</option>
+                            <option value="60">每 1 小时</option>
+                            <option value="120">每 2 小时</option>
+                            <option value="240">每 4 小时</option>
+                        </select>
                     </div>
                 </div>
 
@@ -208,14 +203,14 @@ async function loadSettings() {
             if (ap.default_comment_count) {
                 countSelect.value = ap.default_comment_count;
             }
-            setToggleState('toggle-auto-ai-summary', ap.auto_ai_summary);
         }
 
         // 通知偏好
         if (currentSettings.notification_preferences) {
             const np = currentSettings.notification_preferences;
             setToggleState('toggle-analysis-complete-notify', np.analysis_complete_notify);
-            setToggleState('toggle-anomaly-alert', np.anomaly_alert);
+            const sel = document.getElementById('setting-report-interval');
+            if (sel) sel.value = np.report_interval_minutes ?? 30;
         }
 
         // 账户信息
@@ -255,20 +250,6 @@ async function onDefaultCommentCountChange() {
     }
 }
 
-/** 自动 AI 总结开关 → 保存 */
-async function onToggleAutoAiSummary() {
-    const el = document.getElementById('toggle-auto-ai-summary');
-    const newVal = !el.classList.contains('on');
-    el.classList.toggle('on');
-    try {
-        await api.updateAnalysisPreferences({ auto_ai_summary: newVal });
-    } catch (e) {
-        console.error('update auto_ai_summary error:', e);
-        alert('保存失败：' + (e.message || '未知错误'));
-        await loadSettings();
-    }
-}
-
 // ---- 通知偏好变更处理 ----
 
 /** 分析完成通知开关 → 保存 */
@@ -285,15 +266,14 @@ async function onToggleAnalysisCompleteNotify() {
     }
 }
 
-/** 异常预警通知开关 → 保存 */
-async function onToggleAnomalyAlert() {
-    const el = document.getElementById('toggle-anomaly-alert');
-    const newVal = !el.classList.contains('on');
-    el.classList.toggle('on');
+/** 追踪报告频率下拉变更 → 保存 */
+async function onReportIntervalChange() {
+    const sel = document.getElementById('setting-report-interval');
+    const val = parseInt(sel.value);
     try {
-        await api.updateNotificationPreferences({ anomaly_alert: newVal });
+        await api.updateNotificationPreferences({ report_interval_minutes: val });
     } catch (e) {
-        console.error('update anomaly_alert error:', e);
+        console.error('update report_interval_minutes error:', e);
         alert('保存失败：' + (e.message || '未知错误'));
         await loadSettings();
     }
