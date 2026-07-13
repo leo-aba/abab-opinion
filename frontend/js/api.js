@@ -162,7 +162,7 @@ const api = {
    * @param {number} [days=30] - 查询天数
    * @returns {Promise<{labels: string[], values: number[]}>}
    */
-  getDashboardTrend(days) { return get('/dashboard/trend?days=' + (days || 30)); },
+  getDashboardTrend(days, granularity) { return get('/dashboard/trend?days=' + (days || 30) + '&granularity=' + (granularity || 'day')); },
   /** 获取情绪占比（正面/负面/中性） */
   getDashboardSentimentRatio() { return get('/dashboard/sentiment-ratio'); },
   /**

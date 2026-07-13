@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Dashboard — AI Video Opinion Analytics</title>
+<title>数据总览 — AI Opinion Analytics</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
@@ -24,7 +24,7 @@
         <button class="mobile-menu-btn" onclick="toggleSidebar()">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
         </button>
-        <h2 id="header-title">Dashboard</h2>
+        <h2 id="header-title">数据总览</h2>
         <div class="greeting" id="header-greeting">欢迎回来</div>
       </div>
       <div class="header-stats">
@@ -97,7 +97,10 @@
         <div class="chart-card">
           <div class="chart-card-header">
             <h3>评论增长趋势</h3>
-            <span class="chart-badge">近30天</span>
+            <div class="search-tabs" id="dashboard-trend-tabs">
+              <button class="search-tab active" onclick="switchDashboardTrendGranularity(this, 'day')">按天</button>
+              <button class="search-tab" onclick="switchDashboardTrendGranularity(this, 'hour')">按小时</button>
+            </div>
           </div>
           <div class="chart-wrap"><canvas id="trendChart"></canvas></div>
         </div>
@@ -131,7 +134,7 @@
     // 2. 初始化页面：加载用户信息和顶部统计
     await initPage({ loadUser: true, loadHeaderStats: true });
 
-    // 2. 加载 Dashboard 统计卡片数据
+    // 2. 加载数据总览统计卡片数据
     try {
       const summary = await api.getDashboardSummary();
       if (summary) {
@@ -181,7 +184,7 @@
         }
       }
     } catch (e) {
-      console.error('Dashboard summary failed:', e);
+      console.error('数据总览 summary failed:', e);
       setText('total-comments', '加载失败');
       setText('total-videos', '加载失败');
       setText('hot-topic', '加载失败');

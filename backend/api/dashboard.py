@@ -51,17 +51,17 @@ async def dashboard_summary(
 
 @router.get("/trend", summary="获取评论增长趋势")
 async def dashboard_trend(
-    days: int = Query(30, ge=1, le=365, description="统计天数"),
+    days: int = Query(30, ge=1, le=365, description="统计天数（granularity=day 时有效）"),
+    granularity: str = Query("day", regex="^(day|hour)$", description="粒度: day=按天, hour=按小时"),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """返回近 N 天每天的评论数量，用于折线图。
+    """返回评论趋势数据，用于折线图。
 
-    返回:
-    - labels: [str]  日期标注（MM-DD 格式）
-    - values: [int]  当日评论数（含零值日）
+    按天（day）：近 N 天每天的评论数，labels 格式 MM-DD
+    按小时（hour）：近 24 小时每小时的评论数，labels 格式 HH:00
     """
-    data = await get_dashboard_trend(db, current_user.id, days=days)
+    data = await get_dashboard_trend(db, current_user.id, days=days, granularity=granularity)
     return ok(data)
 
 

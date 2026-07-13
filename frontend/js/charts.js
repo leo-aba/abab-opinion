@@ -5,6 +5,7 @@
 // ============================================================
 let trendChartInstance, sentimentPieInstance, topicBarInstance;
 let resultsTrendInstance, resultsPieInstance, sunburstInstance, radarInstance, trendsDetailInstance;
+let dashboardTrendGranularity = 'day';  // 仪表盘趋势图粒度: day | hour
 
 /**
  * 安全销毁 Chart.js 实例（跳过已销毁或 null 的实例）
@@ -255,7 +256,7 @@ function renderTrendsDetail(data) {
 async function initDashboardCharts() {
   try {
     const [trend, sentiment, topics] = await Promise.all([
-      api.getDashboardTrend(30),
+      api.getDashboardTrend(dashboardTrendGranularity === 'hour' ? 1 : 30, dashboardTrendGranularity),
       api.getDashboardSentimentRatio(),
       api.getDashboardTopTopics(10),
     ]);
@@ -266,5 +267,23 @@ async function initDashboardCharts() {
   } catch (e) {
     console.error('Dashboard charts failed:', e);
     return null;
+  }
+}
+
+/**
+ * 切换仪表盘趋势图粒度（day / hour）并重新加载
+ * @param {HTMLElement} btn - 被点击的 tab 按钮
+ * @param {'day'|'hour'} granularity
+ */
+async function switchDashboardTrendGranularity(btn, granularity) {
+  document.querySelectorAll('#dashboard-trend-tabs .search-tab').forEach(function(t) { t.classList.remove('active'); });
+  btn.classList.add('active');
+  dashboardTrendGranularity = granularity;
+  try {
+    const days = granularity === 'hour' ? 1 : 30;
+    const trend = await api.getDashboardTrend(days, granularity);
+    renderTrendChart(trend);
+  } catch (e) {
+    console.error('switchDashboardTrendGranularity error:', e);
   }
 }

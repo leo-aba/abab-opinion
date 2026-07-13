@@ -85,12 +85,6 @@
                         <div class="greeting">管理系统配置与偏好</div>
                     </div>
                 </div>
-                <div class="header-stats">
-                    <div class="header-stat"><div class="val" id="stat-today-comments">—</div><div class="lbl">今日评论</div></div>
-                    <div class="header-stat"><div class="val" id="stat-new-videos">—</div><div class="lbl">新增视频</div></div>
-                    <div class="header-stat"><div class="val" id="stat-completion">—</div><div class="lbl">分析完成</div></div>
-                    <div class="header-stat"><div class="val" id="stat-hot-topic">—</div><div class="lbl">最近热点</div></div>
-                </div>
             </header>
 
             <!-- Page Content -->
@@ -139,6 +133,7 @@
                             <div class="setting-desc">实时追踪中每隔多久发送一次分析报告邮件</div>
                         </div>
                         <select id="setting-report-interval" onchange="onReportIntervalChange()" style="padding:8px 12px;border:2px solid #FF7A22;border-radius:10px;background:#000;color:#F8F2E4;font-size:13px;cursor:pointer;">
+                            <option value="0">不发送</option>
                             <option value="15">每 15 分钟</option>
                             <option value="30">每 30 分钟</option>
                             <option value="60">每 1 小时</option>

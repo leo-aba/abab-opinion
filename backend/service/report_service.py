@@ -393,8 +393,11 @@ async def try_send_periodic_report(
         if not user.email:
             return False
 
-        # 3) 间隔：默认 30 分钟，最小 5 分钟
-        interval_mins = max(5, user_settings.report_interval_minutes if user_settings else 30)
+        # 3) 间隔：0 表示不发送，默认 30 分钟，其余最小 5 分钟
+        raw_interval = user_settings.report_interval_minutes if user_settings else 30
+        if raw_interval == 0:
+            return False  # 用户选择不发送
+        interval_mins = max(5, raw_interval)
 
         # 4) 检查是否距上次发送足够久
         now = datetime.utcnow()
